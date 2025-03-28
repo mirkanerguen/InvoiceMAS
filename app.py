@@ -1,6 +1,8 @@
 import streamlit as st
 from agents.supervisor_agent import SupervisorAgent
 import tempfile
+import pandas as pd
+import re
 
 st.title("📄 InvoiceMAS Supervisor-Validation")
 
@@ -15,13 +17,19 @@ if uploaded_pdf:
 
     if st.button("Validation-Agent starten"):
         with st.spinner("Validierung läuft..."):
-            result = supervisor.run_workflow()
+            validation_result = supervisor.action()
+
+            # Robuste DataFrame-Erstellung
+            matches = re.findall(r'\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|', validation_result)
+            header = [col.strip() for col in matches[0]]
+            data_rows = [
+                [col.strip() for col in row]
+                for row in matches[1:]
+                if '---' not in row[0] and row[0] != ''
+            ]
+            df_result = pd.DataFrame(data_rows, columns=header)
+
         st.success("Validierung abgeschlossen!")
-        
-        # Markdown-Tabelle ordentlich formatieren
+
         st.markdown("### 📑 Ergebnis der sachlichen Prüfung:")
-        st.markdown(result.replace('|', '\|'), unsafe_allow_html=False)
-        
-        # Falls Markdown Tabelle Probleme macht, als Codeblock anzeigen:
-        st.markdown("### 📑 Ergebnis (alternativ formatiert):")
-        st.code(result, language="markdown")
+        st.dataframe(df_result, use_container_width=True)
