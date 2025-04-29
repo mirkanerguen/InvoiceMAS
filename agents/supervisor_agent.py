@@ -1,5 +1,6 @@
 from langchain_community.llms import Ollama
 from agents.validation_agent import ValidationAgent
+from agents.accounting_agent import AccountingAgent
 import json
 
 class SupervisorAgent:
@@ -48,6 +49,9 @@ class SupervisorAgent:
                 self.save_intermediate_result('validation', validation_result)
 
         return validation_result
+    
+        accounting_agent = AccountingAgent("data/intermediate_results.json")
+        costcenter = accounting_agent.action()
 
     def sv_prompt(self, previous_result, error_description):
         prompt = (f"Der vorherige Versuch hat Fehler produziert: {error_description}. "
