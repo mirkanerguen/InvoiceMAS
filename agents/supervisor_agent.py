@@ -48,10 +48,14 @@ class SupervisorAgent:
                 validation_result = self.validation_agent.run_with_user_input(missing_info)
                 self.save_intermediate_result('validation', validation_result)
 
-        return validation_result
-    
+        # --- Hier erst Accounting-Agent starten ---
+        print("SupervisorAgent: Starte Accounting-Agent.")
         accounting_agent = AccountingAgent("data/intermediate_results.json")
-        costcenter = accounting_agent.action()
+        cost_center = accounting_agent.action()
+        self.save_intermediate_result('accounting', cost_center)
+
+        return cost_center
+
 
     def sv_prompt(self, previous_result, error_description):
         prompt = (f"Der vorherige Versuch hat Fehler produziert: {error_description}. "
