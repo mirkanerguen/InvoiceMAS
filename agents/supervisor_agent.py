@@ -1,6 +1,7 @@
 from langchain_community.llms import Ollama
 from agents.validation_agent import ValidationAgent
 from agents.accounting_agent import AccountingAgent
+from agents.approval_agent import ApprovalAgent
 from agents.check_agent import CheckAgent
 
 import json
@@ -62,7 +63,16 @@ class SupervisorAgent:
         check_result = check_agent.action()
         self.save_intermediate_result('check', check_result)
 
-        return check_result  # oder cost_center, wenn du willst
+        # 4. Freigabe
+        print("SupervisorAgent: Starte Approval-Agent.")
+        approval_agent = ApprovalAgent("data/intermediate_results.json")
+        decision_text = approval_agent.think()
+        approval_result = approval_agent.action(decision_text)
+        self.save_intermediate_result("approval", approval_result)
+
+
+        return approval_result
+
 
 
 
@@ -81,3 +91,6 @@ class SupervisorAgent:
         self.results[step] = result
         with open('data/intermediate_results.json', 'w') as file:
             json.dump(self.results, file, indent=4)
+
+    
+    __all__ = ["SupervisorAgent"]

@@ -53,3 +53,12 @@ if uploaded_pdf:
             st.success(check_result)
         else:
             st.error(check_result)
+
+        # 4. Ergebnis der Approval-Entscheidung
+        approval = results.get("approval", "")
+        st.markdown("### Ergebnis der finalen Freigabe:")
+        if "✅" in approval:
+            st.success(approval)
+        else:
+            st.error(approval)
+
