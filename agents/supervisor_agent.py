@@ -1,6 +1,8 @@
 from langchain_community.llms import Ollama
 from agents.validation_agent import ValidationAgent
 from agents.accounting_agent import AccountingAgent
+from agents.check_agent import CheckAgent
+
 import json
 
 class SupervisorAgent:
@@ -48,13 +50,20 @@ class SupervisorAgent:
                 validation_result = self.validation_agent.run_with_user_input(missing_info)
                 self.save_intermediate_result('validation', validation_result)
 
-        # --- Hier erst Accounting-Agent starten ---
+        # 2. Accounting
         print("SupervisorAgent: Starte Accounting-Agent.")
         accounting_agent = AccountingAgent("data/intermediate_results.json")
         cost_center = accounting_agent.action()
         self.save_intermediate_result('accounting', cost_center)
 
-        return cost_center
+        # 3. Sachliche Prüfung
+        print("SupervisorAgent: Starte Check-Agent (sachliche Prüfung).")
+        check_agent = CheckAgent("data/intermediate_results.json")
+        check_result = check_agent.action()
+        self.save_intermediate_result('check', check_result)
+
+        return check_result  # oder cost_center, wenn du willst
+
 
 
     def sv_prompt(self, previous_result, error_description):

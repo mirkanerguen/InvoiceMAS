@@ -1,0 +1,11 @@
+{
+    "invoices": [
+      {
+        "rechnungsnummer": "R-1321321",
+        "lieferant": "Karbo- Power UG",
+        "leistung": "Eingangsberatung, Erstellung Businessplan, Begleitung Bankgespräch",
+        "betrag_netto": 2450.00
+      }
+    ]
+  }
+  

@@ -45,3 +45,11 @@ if uploaded_pdf:
         cost_center = results.get("accounting", "")
         st.markdown("###   Ergebnis der Accounting-Zuordnung:")
         st.success(f"Zugeordnete Kostenstelle: **{cost_center}**")
+        
+        # 3. Ergebnis der sachlichen Prüfung
+        check_result = results.get("check", "")
+        st.markdown("###   Ergebnis der sachlichen Prüfung:")
+        if check_result.startswith("✅"):
+            st.success(check_result)
+        else:
+            st.error(check_result)
