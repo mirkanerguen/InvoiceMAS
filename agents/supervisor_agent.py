@@ -2,6 +2,7 @@ from langchain_community.llms import Ollama
 from agents.validation_agent import ValidationAgent
 from agents.accounting_agent import AccountingAgent
 from agents.approval_agent import ApprovalAgent
+from agents.booking_agent import BookingAgent
 from agents.check_agent import CheckAgent
 
 import json
@@ -71,7 +72,14 @@ class SupervisorAgent:
         self.save_intermediate_result("approval", approval_result)
 
 
-        return approval_result
+
+        print("SupervisorAgent: Starte Booking-Agent.")
+        booking_agent = BookingAgent("data/intermediate_results.json")
+        booking_result = booking_agent.action()
+        self.save_intermediate_result("booking", booking_result)
+
+        return booking_result
+
 
 
 

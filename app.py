@@ -62,3 +62,14 @@ if uploaded_pdf:
         else:
             st.error(approval)
 
+        # 5. Ergebnis der Buchung
+        booking = results.get("booking", "")
+        st.markdown("### Ergebnis der Buchung:")
+        if "📘" in booking or "gebucht" in booking.lower():
+            st.success(booking)
+        elif "⚠️" in booking:
+            st.warning(booking)
+        else:
+            st.info("Noch keine Buchung erfolgt.")
+
+
