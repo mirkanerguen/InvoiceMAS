@@ -1,5 +1,4 @@
 import json
-import re
 from langchain_community.llms import Ollama
 from utils.login import check_credentials
 
@@ -7,75 +6,85 @@ class ApprovalAgent:
     def __init__(self, result_path="data/results.json"):
         self.llm = Ollama(model="mistral")
         self.result_path = result_path
-        with open(result_path, "r", encoding="utf-8") as f:
+
+        with open(self.result_path, "r", encoding="utf-8") as f:
             self.data = json.load(f)
+
         self.validation_text = self.data.get("validation", "")
 
     def goal(self):
-        return "Entscheide, ob die Rechnung basierend auf dem Bruttobetrag genehmigt werden darf. Authentifiziere ggf. die verantwortliche Person."
-
-    def prompt(self, invoice_text):
-        return f"""
-Du bist ein Freigabe-Agent für eingehende Rechnungen.
-
-Du erhältst einen strukturierten Rechnungsauszug.
-Analysiere den Bruttobetrag und bestimme, wer die Genehmigung erteilen muss:
-
-- Bis 500 €: Mitarbeiter
-- Bis 5.000 €: Teamleiter
-- Über 5.000 €: Abteilungsleiter
-
-Antwortformat:
-1. Bruttobetrag: [Betrag]
-2. Zuständige Rolle: [Rolle]
-
-Rechnungsauszug:
-{invoice_text}
-"""
+        return (
+            "Bestimme anhand des Bruttobetrags in einer Rechnung, "
+            "welche hierarchische Rolle (Mitarbeiter, Teamleiter, Abteilungsleiter) "
+            "die Genehmigung erteilen muss. Entscheide selbstständig, ob eine Freigabe möglich ist."
+        )
 
     def think(self):
-        print("ApprovalAgent Think(): Prüfe Betrag und bestimme Rolle.")
-        formatted_prompt = self.prompt(self.validation_text)
-        response = self.llm.invoke(formatted_prompt)
-        print("ApprovalAgent Antwort:", response)
+        goal_text = self.goal()
+
+        full_prompt = f"""
+Du bist ein autonomer Freigabe-Agent.
+
+Dein Ziel lautet:
+„{goal_text}“
+
+Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0–3)** zurück, die deine Entscheidung darstellt:
+
+1 = Genehmigung durch Mitarbeiter (bis 500 €)  
+2 = Genehmigung durch Teamleiter (501–5.000 €)  
+3 = Genehmigung durch Abteilungsleiter (ab 5.001 €)  
+0 = Genehmigung verweigern
+
+Rechnungsauszug:
+{self.validation_text}
+
+Antwort (nur Zahl): 
+"""
+        print("ApprovalAgent Think(): Ziel definiert und Prompt gesendet.")
+        response = self.llm.invoke(full_prompt).strip()
+        print("ApprovalAgent Entscheidung:", response)
         return response
 
-    def action(self, decision_text):
-        rolle_match = re.search(r"[Zz]uständige[r]? Rolle[: ]*(\w+)", decision_text)
-        betrag_match = re.search(r"[Bb]rutt[o]?-?[Bb]etrag[: ]*([\d.,]+)", decision_text)
+    def action(self, decision_code):
+        result = "Unbekannter Entscheidungswert"
+        status = "offen"
 
-        rolle = rolle_match.group(1).strip().lower() if rolle_match else "unbekannt"
-        betrag = float(betrag_match.group(1).replace(".", "").replace(",", ".")) if betrag_match else 0.0
-
-        if rolle == "mitarbeiter":
+        if decision_code == "1":
             result = "Genehmigt – Rolle: Mitarbeiter"
+            status = "genehmigt"
 
-        elif rolle == "teamleiter":
-            username = input("Login Teamleiter – Benutzername: ")
-            password = input("Passwort: ")
-            if check_credentials(username, password):
+        elif decision_code == "2":
+            print("Login Teamleiter:")
+            if check_credentials(input("Benutzername: "), input("Passwort: ")):
                 result = "Genehmigt – Rolle: Teamleiter"
+                status = "genehmigt"
             else:
                 result = "Login fehlgeschlagen – Genehmigung verweigert"
+                status = "verweigert"
 
-        elif rolle == "abteilungsleiter":
-            username = input("Login Abteilungsleiter – Benutzername: ")
-            password = input("Passwort: ")
-            if check_credentials(username, password):
+        elif decision_code == "3":
+            print("Login Abteilungsleiter:")
+            if check_credentials(input("Benutzername: "), input("Passwort: ")):
                 result = "Genehmigt – Rolle: Abteilungsleiter"
+                status = "genehmigt"
             else:
                 result = "Login fehlgeschlagen – Genehmigung verweigert"
+                status = "verweigert"
 
-        else:
-            result = "Rolle konnte nicht zuverlässig ermittelt werden"
+        elif decision_code == "0":
+            result = "Genehmigung verweigert"
+            status = "verweigert"
 
-        # Ergebnis speichern
+        # Ergebnisse speichern
         self.data["approval"] = result
+        self.data["approval_status"] = status
+
         with open(self.result_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
 
+        print("ApprovalAgent: Entscheidung gespeichert.")
         return result
 
     def run(self):
-        thoughts = self.think()
-        return self.action(thoughts)
+        decision = self.think()
+        return self.action(decision)

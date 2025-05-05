@@ -62,10 +62,10 @@ if uploaded_pdf:
         # 4. Freigabe
         st.markdown("### Ergebnis der finalen Freigabe:")
         approval_text = results.get("approval", "")
-        approval_status = results.get("approval_status", "")
-        if "Genehmigt" in approval_text:
+
+        if isinstance(approval_text, str) and "Genehmigt" in approval_text:
             st.success(approval_text)
-        elif "Verweigert" in approval_text:
+        elif isinstance(approval_text, str) and "Verweigert" in approval_text:
             st.error(approval_text)
         else:
             st.warning("Keine Freigabeentscheidung erfolgt.")
