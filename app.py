@@ -26,6 +26,11 @@ if uploaded_pdf:
         with open("data/intermediate_results.json", "r") as f:
             results = json.load(f)
 
+
+
+        
+
+
         # 1. Ergebnis der formellen Prüfung
         validation_result = results.get("validation", "")
         st.markdown("###   Ergebnis der formellen Prüfung:")
@@ -71,5 +76,21 @@ if uploaded_pdf:
             st.warning(booking)
         else:
             st.info("Noch keine Buchung erfolgt.")
+
+        # 6. Archivierungs-Ergebnis
+        archive = results.get("archive", "")
+        st.markdown("### Archivierung:")
+        st.info(archive)
+
+        st.markdown("### 📦 Archivierte Rechnungen:")
+
+        import sqlite3
+        conn = sqlite3.connect("invoice_archive.db")
+        df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
+        conn.close()
+
+        st.dataframe(df_archive, use_container_width=True)
+
+
 
 

@@ -4,6 +4,8 @@ from agents.accounting_agent import AccountingAgent
 from agents.approval_agent import ApprovalAgent
 from agents.booking_agent import BookingAgent
 from agents.check_agent import CheckAgent
+from agents.archive_agent import ArchiveAgent
+
 
 import json
 
@@ -70,15 +72,20 @@ class SupervisorAgent:
         decision_text = approval_agent.think()
         approval_result = approval_agent.action(decision_text)
         self.save_intermediate_result("approval", approval_result)
-
-
-
+        
+        # 5. Buhchung
         print("SupervisorAgent: Starte Booking-Agent.")
         booking_agent = BookingAgent("data/intermediate_results.json")
         booking_result = booking_agent.action()
         self.save_intermediate_result("booking", booking_result)
 
-        return booking_result
+        # 6. Archivierung
+        print("SupervisorAgent: Starte Archivierungs-Agent.")
+        archive_agent = ArchiveAgent("data/intermediate_results.json", self.pdf_path)
+        archive_result = archive_agent.action()
+        self.save_intermediate_result("archive", archive_result)
+
+        return archive_result
 
 
 
