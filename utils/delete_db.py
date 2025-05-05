@@ -1,27 +1,23 @@
+import sqlite3
 import os
-import shutil
 
-DB_PATH = "data/archive.db"
-ARCHIVE_DIR = "archive"
+# Basisverzeichnis (z. B. C:/InvoiceMAS/)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+data_dir = os.path.join(BASE_DIR, "data")
+db_path = os.path.join(data_dir, "archive.db")
 
-def delete_database():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-        print(f"Datenbankdatei '{DB_PATH}' wurde erfolgreich gelöscht.")
-    else:
-        print(f"Keine Datenbankdatei unter '{DB_PATH}' gefunden.")
+if not os.path.exists(db_path):
+    print(f"Keine Datenbankdatei unter '{db_path}' gefunden.")
+else:
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
 
-def delete_archive_folder():
-    if os.path.exists(ARCHIVE_DIR):
-        shutil.rmtree(ARCHIVE_DIR)
-        print(f"Archivordner '{ARCHIVE_DIR}' wurde erfolgreich gelöscht.")
-    else:
-        print(f"Kein Archivordner unter '{ARCHIVE_DIR}' gefunden.")
+        cursor.execute("DELETE FROM archive")  # Alle Zeilen löschen
+        conn.commit()
 
-if __name__ == "__main__":
-    confirm = input("Möchtest du die Datenbank und alle archivierten Rechnungen löschen? (ja/nein): ").lower()
-    if confirm == "ja":
-        delete_database()
-        delete_archive_folder()
-    else:
-        print("Vorgang abgebrochen.")
+        print(f"Alle Einträge in der Tabelle 'archive' wurden gelöscht ({db_path}).")
+    except Exception as e:
+        print(f"Fehler beim Leeren der Datenbank: {e}")
+    finally:
+        conn.close()

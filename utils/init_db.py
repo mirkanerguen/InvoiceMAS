@@ -1,23 +1,29 @@
-import os
 import sqlite3
+import os
 
-# Stelle sicher, dass der Ordner existiert
-os.makedirs("data", exist_ok=True)
+# Basisverzeichnis ermitteln (z. B. .../InvoiceMAS/)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+data_dir = os.path.join(BASE_DIR, "data")
+db_path = os.path.join(data_dir, "archive.db")
 
-# Erstelle/verknüpfe Datenbank
-conn = sqlite3.connect("data/archive.db")
-c = conn.cursor()
+# Sicherstellen, dass der Datenordner existiert
+os.makedirs(data_dir, exist_ok=True)
 
-c.execute("""
-    CREATE TABLE IF NOT EXISTS archive (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        rechnungsnummer TEXT,
-        archiviert_am TEXT,
-        pfad TEXT
-    )
-""")
+try:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-conn.commit()
-conn.close()
-
-print("Tabelle 'archive' wurde erfolgreich erstellt.")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rechnungsnummer TEXT,
+            archiviert_am TEXT,
+            pfad TEXT
+        )
+    """)
+    conn.commit()
+    print("Tabelle 'archive' wurde erfolgreich erstellt unter:", db_path)
+except Exception as e:
+    print(f"Fehler beim Erstellen der Tabelle: {e}")
+finally:
+    conn.close()

@@ -63,25 +63,26 @@ if uploaded_pdf:
         st.markdown("### Ergebnis der finalen Freigabe:")
         approval_text = results.get("approval", "")
         approval_status = results.get("approval_status", "")
-        if approval_status == "genehmigt":
+        if "Genehmigt" in approval_text:
             st.success(approval_text)
-        elif approval_status == "verweigert":
+        elif "Verweigert" in approval_text:
             st.error(approval_text)
         else:
             st.warning("Keine Freigabeentscheidung erfolgt.")
 
+
         # 5. Buchung
         st.markdown("### Ergebnis der Buchung:")
         booking_text = results.get("booking", "")
-        booking_status = results.get("booking_status", "")
-        if booking_status == "gebucht":
+        if "gebucht" in booking_text.lower():
             st.success(booking_text)
-        elif booking_status == "abgebrochen":
+        elif "abgebrochen" in booking_text.lower():
             st.warning(booking_text)
-        elif booking_status == "offen":
+        elif "offen" in booking_text.lower():
             st.info("Noch keine Buchung erfolgt.")
         else:
             st.error("Unbekannter Buchungsstatus.")
+
 
         # 6. Archivierung
         st.markdown("### Archivierung:")
@@ -90,7 +91,7 @@ if uploaded_pdf:
 
         # 7. Historie (Archivierte Rechnungen)
         st.markdown("### Archivierte Rechnungen:")
-        conn = sqlite3.connect("data/archive.db")
+        conn = sqlite3.connect("data/archive.db")  
         df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
         conn.close()
         st.dataframe(df_archive, use_container_width=True)
