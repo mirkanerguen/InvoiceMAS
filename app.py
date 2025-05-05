@@ -90,7 +90,7 @@ if uploaded_pdf:
 
         # 7. Historie (Archivierte Rechnungen)
         st.markdown("### Archivierte Rechnungen:")
-        conn = sqlite3.connect("invoice_archive.db")
+        conn = sqlite3.connect("data/archive.db")
         df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
         conn.close()
         st.dataframe(df_archive, use_container_width=True)

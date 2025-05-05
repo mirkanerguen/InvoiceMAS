@@ -73,11 +73,17 @@ class SupervisorAgent:
         approval_result = approval_agent.action(decision_text)
         self.save_intermediate_result("approval", approval_result)
         
-        # 5. Buhchung
+        # 5. Buchung
         print("SupervisorAgent: Starte Booking-Agent.")
         booking_agent = BookingAgent("data/results.json")
         booking_result = booking_agent.action()
         self.save_intermediate_result("booking", booking_result)
+        booking_status = self.get_booking_status()
+
+        if booking_status == "abgebrochen":
+            print("SupervisorAgent: Rechnung bereits gebucht – Archivierung wird übersprungen.")
+            return booking_result  # Stoppe den Workflow hier
+
 
         # 6. Archivierung
         print("SupervisorAgent: Starte Archivierungs-Agent.")
@@ -89,7 +95,7 @@ class SupervisorAgent:
 
 
 
-
+    
 
     def sv_prompt(self, previous_result, error_description):
         prompt = (f"Der vorherige Versuch hat Fehler produziert: {error_description}. "
@@ -106,6 +112,12 @@ class SupervisorAgent:
         self.results[step] = result
         with open('data/results.json', 'w') as file:
             json.dump(self.results, file, indent=4)
+
+    def get_booking_status(self):
+        with open("data/results.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("booking_status", "")
+
 
     
     __all__ = ["SupervisorAgent"]

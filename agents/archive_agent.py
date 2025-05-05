@@ -26,10 +26,15 @@ class ArchiveAgent:
     def action(self):
         data = self.think()
 
-        # Rechnungsnummer extrahieren
+        # Rechnungsnummer extrahieren (muss vor der Prüfung passieren!)
         validation_table = data.get("validation", "")
         rechnungsnummer = self._extract_field(validation_table, "6. Fortlaufende Rechnungsnummer") or "unknown"
         rechnungsnummer = rechnungsnummer.replace(":", "").replace("/", "").replace("\\", "").strip()
+
+        # Prüfe, ob diese Rechnung schon archiviert wurde
+        if self.is_already_archived(rechnungsnummer):
+            return f"Archivierung abgebrochen – Rechnung {rechnungsnummer} wurde bereits archiviert."
+
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -66,6 +71,15 @@ class ArchiveAgent:
         """)
         conn.commit()
         conn.close()
+
+    def is_already_archived(self, rechnungsnummer):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM archive WHERE rechnungsnummer = ?", (rechnungsnummer,))
+        count = c.fetchone()[0]
+        conn.close()
+        return count > 0
+
 
     def _save_to_db(self, rechnungsnummer, pfad):
         conn = sqlite3.connect(self.db_path)

@@ -30,9 +30,11 @@ class BookingAgent:
         gedanke = self.think()
         validation = self.data.get("validation", "")
 
+        # Rechnungsnummer extrahieren
         match_nr = re.search(r"\|6\. Fortlaufende Rechnungsnummer\s*\|\s*Ja\s*\|\s*(.*?)\s*\|", validation)
         rechnungsnummer = match_nr.group(1).strip() if match_nr else "UNBEKANNT"
 
+        # Prüfen ob bereits gebucht (aus SQLite DB)
         if self.is_invoice_already_booked(rechnungsnummer):
             result = f"Buchung abgebrochen – Rechnung {rechnungsnummer} wurde bereits gebucht."
             self.data["booking"] = result
@@ -40,10 +42,12 @@ class BookingAgent:
             self._save()
             return result
 
+        # Kostenstelle und Bruttobetrag extrahieren
         kostenstelle = self.data.get("accounting", "Unbekannt")
         match_betrag = re.search(r"Brutto[: ]*([\d\.,]+)", validation.replace("\n", " "))
         betrag = match_betrag.group(1).replace(".", "").replace(",", ".") if match_betrag else "0.00"
 
+        # Prompt zur Buchungserklärung
         buchung_prompt = f"""
 Du bist ein Buchhaltungs-Agent. Dein Ziel: Simuliere die Buchung der Rechnung.
 
@@ -57,6 +61,7 @@ Buchung erfolgt: [Betrag] EUR auf [Kostenstelle] – Status: gebucht
 """
         buchung_text = self.llm.invoke(buchung_prompt).strip()
 
+        # Ergebnisse in results.json speichern
         self.data["booking"] = buchung_text
         self.data["booking_status"] = "gebucht"
         self._save()

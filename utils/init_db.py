@@ -1,6 +1,11 @@
+import os
 import sqlite3
 
-conn = sqlite3.connect("data/archive.db")  # Achte auf den korrekten Pfad zur DB
+# Stelle sicher, dass der Ordner existiert
+os.makedirs("data", exist_ok=True)
+
+# Erstelle/verknüpfe Datenbank
+conn = sqlite3.connect("data/archive.db")
 c = conn.cursor()
 
 c.execute("""
@@ -14,4 +19,5 @@ c.execute("""
 
 conn.commit()
 conn.close()
+
 print("Tabelle 'archive' wurde erfolgreich erstellt.")
