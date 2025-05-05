@@ -3,6 +3,8 @@ from agents.supervisor_agent import SupervisorAgent
 import tempfile
 import pandas as pd
 import re
+import sqlite3
+import json
 
 st.title("Invoice-Workflow MAS")
 
@@ -21,19 +23,12 @@ if uploaded_pdf:
 
         st.success("Workflow abgeschlossen!")
 
-        # Zwischenergebnisse laden
-        import json
-        with open("data/intermediate_results.json", "r") as f:
+        with open("data/results.json", "r") as f:
             results = json.load(f)
 
-
-
-        
-
-
-        # 1. Ergebnis der formellen Prüfung
+        # 1. Formelle Prüfung
         validation_result = results.get("validation", "")
-        st.markdown("###   Ergebnis der formellen Prüfung:")
+        st.markdown("### Ergebnis der formellen Prüfung:")
         if "|" in validation_result:
             matches = re.findall(r'\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|', validation_result)
             if matches:
@@ -46,51 +41,56 @@ if uploaded_pdf:
                 df_validation = pd.DataFrame(data_rows, columns=header)
                 st.dataframe(df_validation, use_container_width=True)
 
-        #  2. Ergebnis der Kostenstellen-Zuordnung
-        cost_center = results.get("accounting", "")
-        st.markdown("###   Ergebnis der Accounting-Zuordnung:")
+        # 2. Kostenstelle
+        st.markdown("### Ergebnis der Kostenstellen-Zuordnung:")
+        cost_center = results.get("accounting", "Nicht zugewiesen")
         st.success(f"Zugeordnete Kostenstelle: **{cost_center}**")
-        
+
         # 3. Ergebnis der sachlichen Prüfung
         check_result = results.get("check", "")
         st.markdown("###   Ergebnis der sachlichen Prüfung:")
-        if check_result.startswith("✅"):
-            st.success(check_result)
+        if check_result == "sachlich_korrekt":
+            st.success("Sachlich korrekt – plausibler Abgleich mit bekannten Transaktionen.")
+        elif check_result == "nicht_nachvollziehbar":
+            st.error("Sachlich nicht nachvollziehbar – kein Abgleich mit interner Referenz möglich.")
+        elif check_result == "unklar":
+            st.warning("Unklare KI-Antwort – manuelle Prüfung empfohlen.")
         else:
-            st.error(check_result)
+            st.info("Kein Ergebnis zur sachlichen Prüfung vorhanden.")
 
-        # 4. Ergebnis der Approval-Entscheidung
-        approval = results.get("approval", "")
+
+        # 4. Freigabe
         st.markdown("### Ergebnis der finalen Freigabe:")
-        if "✅" in approval:
-            st.success(approval)
+        approval_text = results.get("approval", "")
+        approval_status = results.get("approval_status", "")
+        if approval_status == "genehmigt":
+            st.success(approval_text)
+        elif approval_status == "verweigert":
+            st.error(approval_text)
         else:
-            st.error(approval)
+            st.warning("Keine Freigabeentscheidung erfolgt.")
 
-        # 5. Ergebnis der Buchung
-        booking = results.get("booking", "")
+        # 5. Buchung
         st.markdown("### Ergebnis der Buchung:")
-        if "📘" in booking or "gebucht" in booking.lower():
-            st.success(booking)
-        elif "⚠️" in booking:
-            st.warning(booking)
-        else:
+        booking_text = results.get("booking", "")
+        booking_status = results.get("booking_status", "")
+        if booking_status == "gebucht":
+            st.success(booking_text)
+        elif booking_status == "abgebrochen":
+            st.warning(booking_text)
+        elif booking_status == "offen":
             st.info("Noch keine Buchung erfolgt.")
+        else:
+            st.error("Unbekannter Buchungsstatus.")
 
-        # 6. Archivierungs-Ergebnis
-        archive = results.get("archive", "")
+        # 6. Archivierung
         st.markdown("### Archivierung:")
-        st.info(archive)
+        archive_info = results.get("archive", "Keine Archivierungsinformationen.")
+        st.info(archive_info)
 
-        st.markdown("### 📦 Archivierte Rechnungen:")
-
-        import sqlite3
+        # 7. Historie (Archivierte Rechnungen)
+        st.markdown("### Archivierte Rechnungen:")
         conn = sqlite3.connect("invoice_archive.db")
         df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
         conn.close()
-
         st.dataframe(df_archive, use_container_width=True)
-
-
-
-

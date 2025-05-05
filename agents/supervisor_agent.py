@@ -56,32 +56,32 @@ class SupervisorAgent:
 
         # 2. Accounting
         print("SupervisorAgent: Starte Accounting-Agent.")
-        accounting_agent = AccountingAgent("data/intermediate_results.json")
+        accounting_agent = AccountingAgent("data/results.json")
         cost_center = accounting_agent.action()
         self.save_intermediate_result('accounting', cost_center)
 
         # 3. Sachliche Prüfung
         print("SupervisorAgent: Starte Check-Agent (sachliche Prüfung).")
-        check_agent = CheckAgent("data/intermediate_results.json")
+        check_agent = CheckAgent("data/results.json")
         check_result = check_agent.action()
         self.save_intermediate_result('check', check_result)
 
         # 4. Freigabe
         print("SupervisorAgent: Starte Approval-Agent.")
-        approval_agent = ApprovalAgent("data/intermediate_results.json")
+        approval_agent = ApprovalAgent("data/results.json")
         decision_text = approval_agent.think()
         approval_result = approval_agent.action(decision_text)
         self.save_intermediate_result("approval", approval_result)
         
         # 5. Buhchung
         print("SupervisorAgent: Starte Booking-Agent.")
-        booking_agent = BookingAgent("data/intermediate_results.json")
+        booking_agent = BookingAgent("data/results.json")
         booking_result = booking_agent.action()
         self.save_intermediate_result("booking", booking_result)
 
         # 6. Archivierung
         print("SupervisorAgent: Starte Archivierungs-Agent.")
-        archive_agent = ArchiveAgent("data/intermediate_results.json", self.pdf_path)
+        archive_agent = ArchiveAgent("data/results.json", self.pdf_path)
         archive_result = archive_agent.action()
         self.save_intermediate_result("archive", archive_result)
 
@@ -104,7 +104,7 @@ class SupervisorAgent:
 
     def save_intermediate_result(self, step, result):
         self.results[step] = result
-        with open('data/intermediate_results.json', 'w') as file:
+        with open('data/results.json', 'w') as file:
             json.dump(self.results, file, indent=4)
 
     

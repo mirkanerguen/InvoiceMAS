@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 import re
 
 class CheckAgent:
-    def __init__(self, validation_result_path="data/intermediate_results.json", reference_path="data/known_transactions.json"):
+    def __init__(self, validation_result_path="data/results.json", reference_path="data/known_transactions.json"):
         self.llm = Ollama(model="mistral")
         with open(validation_result_path, "r", encoding="utf-8") as f:
             self.data = json.load(f)["validation"]
@@ -29,7 +29,7 @@ class CheckAgent:
         # Bereite bekannte Daten als Liste auf
         referenzliste = ""
         for ref in self.known:
-            referenzliste += f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, Leistung: {ref['leistung']}, Netto: {ref['betrag_netto']} €\n"
+            referenzliste += f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €\n"
 
         # Prompt definieren
         prompt_template = PromptTemplate(
@@ -44,21 +44,21 @@ Gegeben ist die extrahierte Rechnung:
 Und hier sind bekannte interne Referenzrechnungen:
 {referenzen}
 
-Vergleiche die Inhalte intelligent (auch semantisch) und antworte nur mit:
-- ✅ Sachlich korrekt (wenn plausible Übereinstimmung besteht)
-- ❌ Sachlich nicht nachvollziehbar (wenn kein plausibler Bezug gefunden wird)
+Vergleiche die Inhalte intelligent (auch semantisch) und antworte ausschließlich mit einem dieser beiden Begriffe:
+- sachlich_korrekt
+- nicht_nachvollziehbar
 """
         )
 
         # Betrag normalisieren
-        netto_match = re.search(r"Netto[: ]*([\d\.,]+)", extracted["betrag"])
-        netto = netto_match.group(1) if netto_match else "unbekannt"
+        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
+        brutto = brutto_match.group(1) if brutto_match else "unbekannt"
 
         rechnung_text = (
             f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
             f"Lieferant: {extracted['lieferant']}\n"
             f"Leistung: {extracted['leistung']}\n"
-            f"Netto-Betrag: {netto} €"
+            f"brutto-Betrag: {brutto} €"
         )
 
         prompt = prompt_template.format(
@@ -67,9 +67,17 @@ Vergleiche die Inhalte intelligent (auch semantisch) und antworte nur mit:
             referenzen=referenzliste
         )
 
-        result = self.llm.invoke(prompt).strip()
-        print("CheckAgent Action():", result)
-        return result
+        result = self.llm.invoke(prompt).strip().lower()
+
+        if result == "sachlich_korrekt":
+            print("CheckAgent Action(): sachlich korrekt")
+            return "sachlich_korrekt"
+        elif result == "nicht_nachvollziehbar":
+            print("CheckAgent Action(): nicht nachvollziehbar")
+            return "nicht_nachvollziehbar"
+        else:
+            print("CheckAgent Action(): unklar – keine eindeutige KI-Antwort erhalten.")
+            return "unklar"
 
     def _extract(self, label):
         pattern = fr"\|\s*{label}.*?\|\s*(Ja|Nein|Fehlt)\s*\|\s*(.*?)\|"

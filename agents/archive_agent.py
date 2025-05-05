@@ -45,7 +45,7 @@ class ArchiveAgent:
         # Eintrag in DB
         self._save_to_db(rechnungsnummer, folder_path)
 
-        return f"📦 Archiviert unter: {folder_path}"
+        return f"Archiviert unter: {folder_path}"
 
     def _extract_field(self, markdown_table, label):
         import re

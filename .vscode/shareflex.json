@@ -1,0 +1,10 @@
+{
+    "projectName": "yourProjectName",
+    "webMappings": {
+        "pscBAF": [
+            "src",
+            "dist"
+        ]
+    },
+    "connections": []
+}

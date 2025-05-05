@@ -1,22 +1,17 @@
 import sqlite3
 
-# Verbindung zur SQLite-Datenbank (Datei wird erstellt, falls sie nicht existiert)
-conn = sqlite3.connect("invoice_archive.db")
-cursor = conn.cursor()
+conn = sqlite3.connect("data/archive.db")  # Achte auf den korrekten Pfad zur DB
+c = conn.cursor()
 
-# Tabelle 'archive' erstellen, falls nicht vorhanden
-cursor.execute("""
+c.execute("""
     CREATE TABLE IF NOT EXISTS archive (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         rechnungsnummer TEXT,
-        kostenstelle TEXT,
-        betrag REAL,
-        pfad TEXT,
-        timestamp TEXT
+        archiviert_am TEXT,
+        pfad TEXT
     )
 """)
 
 conn.commit()
 conn.close()
-
-print("✅ Tabelle 'archive' wurde erfolgreich erstellt.")
+print("Tabelle 'archive' wurde erfolgreich erstellt.")
