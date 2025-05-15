@@ -1,10 +1,11 @@
 import json
 from langchain_community.llms import Ollama
 from utils.login import check_credentials
+from config import OLLAMA_MODEL, RESULTS_PATH, TEAMLEITER_ROLE, ABTEILUNGSLEITER_ROLE
 
 class ApprovalAgent:
-    def __init__(self, result_path="data/results.json"):
-        self.llm = Ollama(model="mistral")
+    def __init__(self, result_path=RESULTS_PATH):
+        self.llm = Ollama(model=OLLAMA_MODEL)
         self.result_path = result_path
 
         with open(self.result_path, "r", encoding="utf-8") as f:
@@ -28,10 +29,10 @@ Du bist ein autonomer Freigabe-Agent.
 Dein Ziel lautet:
 „{goal_text}“
 
-Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0–3)** zurück, die deine Entscheidung darstellt:
+Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0-3)** zurück, die deine Entscheidung darstellt:
 
 1 = Genehmigung durch Mitarbeiter (bis 500 €)  
-2 = Genehmigung durch Teamleiter (501–5.000 €)  
+2 = Genehmigung durch Teamleiter (501-5.000 €)  
 3 = Genehmigung durch Abteilungsleiter (ab 5.001 €)  
 0 = Genehmigung verweigern
 
@@ -50,25 +51,25 @@ Antwort (nur Zahl):
         status = "offen"
 
         if decision_code == "1":
-            result = "Genehmigt – Rolle: Mitarbeiter"
+            result = "Genehmigt - Rolle: Mitarbeiter"
             status = "genehmigt"
 
         elif decision_code == "2":
-            print("Login Teamleiter:")
+            print(f"Login {TEAMLEITER_ROLE}:")
             if check_credentials(input("Benutzername: "), input("Passwort: ")):
-                result = "Genehmigt – Rolle: Teamleiter"
+                result = f"Genehmigt - Rolle: {TEAMLEITER_ROLE}"
                 status = "genehmigt"
             else:
-                result = "Login fehlgeschlagen – Genehmigung verweigert"
+                result = "Login fehlgeschlagen - Genehmigung verweigert"
                 status = "verweigert"
 
         elif decision_code == "3":
-            print("Login Abteilungsleiter:")
+            print(f"Login {ABTEILUNGSLEITER_ROLE}:")
             if check_credentials(input("Benutzername: "), input("Passwort: ")):
-                result = "Genehmigt – Rolle: Abteilungsleiter"
+                result = f"Genehmigt - Rolle: {ABTEILUNGSLEITER_ROLE}"
                 status = "genehmigt"
             else:
-                result = "Login fehlgeschlagen – Genehmigung verweigert"
+                result = "Login fehlgeschlagen - Genehmigung verweigert"
                 status = "verweigert"
 
         elif decision_code == "0":

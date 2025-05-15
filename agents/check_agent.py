@@ -1,15 +1,18 @@
 import json
+import re
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
-import re
+from config import RESULTS_PATH, REFERENCE_DATA_PATH, OLLAMA_MODEL
 
 class CheckAgent:
-    def __init__(self, validation_result_path="data/results.json", reference_path="data/known_transactions.json"):
-        self.llm = Ollama(model="mistral")
+    def __init__(self, validation_result_path=RESULTS_PATH, reference_path=REFERENCE_DATA_PATH):
+        self.llm = Ollama(model=OLLAMA_MODEL)
+
         with open(validation_result_path, "r", encoding="utf-8") as f:
-            self.data = json.load(f)["validation"]
+            self.data = json.load(f).get("validation", "")
+
         with open(reference_path, "r", encoding="utf-8") as f:
-            self.known = json.load(f)["invoices"]
+            self.known = json.load(f).get("invoices", [])
 
     def goal(self):
         return "Vergleiche die Rechnung mit vorhandenen Referenzen, um die sachliche Richtigkeit mit KI zu bewerten."
@@ -26,12 +29,25 @@ class CheckAgent:
     def action(self):
         extracted = self.think()
 
-        # Bereite bekannte Daten als Liste auf
-        referenzliste = ""
-        for ref in self.known:
-            referenzliste += f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €\n"
+        # Referenzdaten vorbereiten
+        referenzliste = "\n".join([
+            f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €"
+            for ref in self.known
+        ])
 
-        # Prompt definieren
+        # Betrag extrahieren
+        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
+        brutto = brutto_match.group(1) if brutto_match else "unbekannt"
+
+        # Rechnungstext zusammensetzen
+        rechnung_text = (
+            f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
+            f"Lieferant: {extracted['lieferant']}\n"
+            f"Leistung: {extracted['leistung']}\n"
+            f"Brutto-Betrag: {brutto} €"
+        )
+
+        # Prompt-Vorlage
         prompt_template = PromptTemplate(
             input_variables=["ziel", "rechnung", "referenzen"],
             template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
@@ -44,21 +60,10 @@ Gegeben ist die extrahierte Rechnung:
 Und hier sind bekannte interne Referenzrechnungen:
 {referenzen}
 
-Vergleiche die Inhalte intelligent (auch semantisch) und antworte ausschließlich mit einem dieser beiden Begriffe:
+Vergleiche die Inhalte intelligent (auch semantisch) und antworte ausschließlich mit einem dieser Begriffe:
 - sachlich_korrekt
 - nicht_nachvollziehbar
 """
-        )
-
-        # Betrag normalisieren
-        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
-        brutto = brutto_match.group(1) if brutto_match else "unbekannt"
-
-        rechnung_text = (
-            f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
-            f"Lieferant: {extracted['lieferant']}\n"
-            f"Leistung: {extracted['leistung']}\n"
-            f"brutto-Betrag: {brutto} €"
         )
 
         prompt = prompt_template.format(
@@ -67,6 +72,7 @@ Vergleiche die Inhalte intelligent (auch semantisch) und antworte ausschließlic
             referenzen=referenzliste
         )
 
+        # KI-Bewertung einholen
         result = self.llm.invoke(prompt).strip().lower()
 
         if result == "sachlich_korrekt":

@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-# Basisverzeichnis ermitteln (z. B. .../InvoiceMAS/)
+# Basisverzeichnis ermitteln 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 data_dir = os.path.join(BASE_DIR, "data")
 db_path = os.path.join(data_dir, "archive.db")

@@ -1,5 +1,6 @@
 import streamlit as st
 from agents.supervisor_agent import SupervisorAgent
+from config import RESULTS_PATH, ARCHIVE_DB_PATH
 import tempfile
 import pandas as pd
 import re
@@ -23,7 +24,7 @@ if uploaded_pdf:
 
         st.success("Workflow abgeschlossen!")
 
-        with open("data/results.json", "r") as f:
+        with open(RESULTS_PATH, "r", encoding="utf-8") as f:
             results = json.load(f)
 
         # 1. Formelle Prüfung
@@ -46,9 +47,9 @@ if uploaded_pdf:
         cost_center = results.get("accounting", "Nicht zugewiesen")
         st.success(f"Zugeordnete Kostenstelle: **{cost_center}**")
 
-        # 3. Ergebnis der sachlichen Prüfung
+        # 3. Sachliche Prüfung
+        st.markdown("### Ergebnis der sachlichen Prüfung:")
         check_result = results.get("check", "")
-        st.markdown("###   Ergebnis der sachlichen Prüfung:")
         if check_result == "sachlich_korrekt":
             st.success("Sachlich korrekt – plausibler Abgleich mit bekannten Transaktionen.")
         elif check_result == "nicht_nachvollziehbar":
@@ -58,18 +59,15 @@ if uploaded_pdf:
         else:
             st.info("Kein Ergebnis zur sachlichen Prüfung vorhanden.")
 
-
         # 4. Freigabe
         st.markdown("### Ergebnis der finalen Freigabe:")
         approval_text = results.get("approval", "")
-
         if isinstance(approval_text, str) and "Genehmigt" in approval_text:
             st.success(approval_text)
         elif isinstance(approval_text, str) and "Verweigert" in approval_text:
             st.error(approval_text)
         else:
             st.warning("Keine Freigabeentscheidung erfolgt.")
-
 
         # 5. Buchung
         st.markdown("### Ergebnis der Buchung:")
@@ -83,7 +81,6 @@ if uploaded_pdf:
         else:
             st.error("Unbekannter Buchungsstatus.")
 
-
         # 6. Archivierung
         st.markdown("### Archivierung:")
         archive_info = results.get("archive", "Keine Archivierungsinformationen.")
@@ -91,7 +88,7 @@ if uploaded_pdf:
 
         # 7. Historie (Archivierte Rechnungen)
         st.markdown("### Archivierte Rechnungen:")
-        conn = sqlite3.connect("data/archive.db")  
+        conn = sqlite3.connect(ARCHIVE_DB_PATH)
         df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
         conn.close()
         st.dataframe(df_archive, use_container_width=True)
