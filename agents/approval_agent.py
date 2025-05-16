@@ -56,35 +56,45 @@ Antwort (nur Zahl):
 
         elif decision_code == "2":
             print(f"Login {TEAMLEITER_ROLE}:")
-            if check_credentials(input("Benutzername: "), input("Passwort: ")):
+            username = input("Benutzername: ")
+            password = input("Passwort: ")
+            if check_credentials(username, password, TEAMLEITER_ROLE):
                 result = f"Genehmigt - Rolle: {TEAMLEITER_ROLE}"
                 status = "genehmigt"
             else:
                 result = "Login fehlgeschlagen - Genehmigung verweigert"
                 status = "verweigert"
+                self._save_result(result, status)
+                return result 
+
 
         elif decision_code == "3":
             print(f"Login {ABTEILUNGSLEITER_ROLE}:")
-            if check_credentials(input("Benutzername: "), input("Passwort: ")):
+            username = input("Benutzername: ")
+            password = input("Passwort: ")
+            if check_credentials(username, password, ABTEILUNGSLEITER_ROLE):
                 result = f"Genehmigt - Rolle: {ABTEILUNGSLEITER_ROLE}"
                 status = "genehmigt"
             else:
                 result = "Login fehlgeschlagen - Genehmigung verweigert"
                 status = "verweigert"
+                self._save_result(result, status)
+                return result  # Early return
 
         elif decision_code == "0":
             result = "Genehmigung verweigert"
             status = "verweigert"
 
         # Ergebnisse speichern
+        self._save_result(result, status)
+        return result
+
+    def _save_result(self, result, status):
         self.data["approval"] = result
         self.data["approval_status"] = status
-
         with open(self.result_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
-
         print("ApprovalAgent: Entscheidung gespeichert.")
-        return result
 
     def run(self):
         decision = self.think()

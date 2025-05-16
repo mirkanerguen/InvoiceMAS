@@ -51,19 +51,26 @@ if uploaded_pdf:
         st.markdown("### Ergebnis der sachlichen Prüfung:")
         check_result = results.get("check", "")
         if check_result == "sachlich_korrekt":
-            st.success("Sachlich korrekt – plausibler Abgleich mit bekannten Transaktionen.")
+            st.success("Sachlich korrekt - plausibler Abgleich mit bekannten Transaktionen.")
         elif check_result == "nicht_nachvollziehbar":
-            st.error("Sachlich nicht nachvollziehbar – kein Abgleich mit interner Referenz möglich.")
+            st.error("Sachlich nicht nachvollziehbar - kein Abgleich mit interner Referenz möglich.")
         elif check_result == "unklar":
-            st.warning("Unklare KI-Antwort – manuelle Prüfung empfohlen.")
+            st.warning("Unklare KI-Antwort - manuelle Prüfung empfohlen.")
         else:
             st.info("Kein Ergebnis zur sachlichen Prüfung vorhanden.")
 
         # 4. Freigabe
         st.markdown("### Ergebnis der finalen Freigabe:")
+        approval_status = results.get("approval_status", "")
+
+        if approval_status == "verweigert":
+            st.error("Freigabe wurde verweigert - Workflow beendet")
+            st.stop()
+
         approval_text = results.get("approval", "")
         if isinstance(approval_text, str) and "Genehmigt" in approval_text:
             st.success(approval_text)
+            
         elif isinstance(approval_text, str) and "Verweigert" in approval_text:
             st.error(approval_text)
         else:

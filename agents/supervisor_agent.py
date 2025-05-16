@@ -74,7 +74,19 @@ class SupervisorAgent:
         approval_agent = ApprovalAgent(RESULTS_PATH)
         decision_text = approval_agent.think()
         approval_result = approval_agent.action(decision_text)
-        self.save_intermediate_result("approval", approval_result)
+
+        # Lese nach dem internen Speichern im Agenten die Datei NEU
+        with open(RESULTS_PATH, "r", encoding="utf-8") as f:
+            updated_results = json.load(f)
+
+        approval_status = updated_results.get("approval_status", "")
+        self.results = updated_results  # Optional: sync im Speicher aktualisieren
+        self.save_intermediate_result("approval", approval_result)  # falls du auch approval_text nochmal mitschreiben willst
+
+        if approval_status == "verweigert":
+            print("SupervisorAgent: Genehmigung verweigert - Workflow wird gestoppt.")
+            return approval_result
+
 
         # 5. Buchung
         print("SupervisorAgent: Starte Booking-Agent.")
