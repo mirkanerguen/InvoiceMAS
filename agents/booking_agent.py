@@ -1,101 +1,80 @@
 import json
 import re
 import sqlite3
-from langchain_community.llms import Ollama
 from config import RESULTS_PATH, ARCHIVE_DB_PATH, OLLAMA_MODEL
+from langchain_community.llms import Ollama
 
 class BookingAgent:
-    def __init__(self, intermediate_path=RESULTS_PATH):
+    def __init__(self, result_path=RESULTS_PATH):
+        self.result_path = result_path
         self.llm = Ollama(model=OLLAMA_MODEL)
-        self.path = intermediate_path
 
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.result_path, "r", encoding="utf-8") as f:
             self.data = json.load(f)
 
         self.validation_text = self.data.get("validation", "")
+        self.cost_center = self.data.get("accounting", "Unbekannt")
 
     def goal(self):
         return "Führe die Buchung der freigegebenen Rechnung durch und kennzeichne sie als gebucht."
 
+    def prompt(self, amount):
+        return f"""
+Du bist ein Buchhaltungsagent. Simuliere eine Buchung auf Basis der folgenden Informationen:
+
+- Betrag: {amount} EUR
+- Kostenstelle: {self.cost_center}
+
+Antworte mit genau folgendem Format:
+Buchung erfolgt: [Betrag] EUR auf [Kostenstelle] - Status: gebucht
+"""
+
     def think(self):
         if self.data.get("booking_status") == "gebucht":
-            return "Diese Rechnung wurde bereits gebucht. Keine Aktion notwendig."
-        return "Die Rechnung ist freigegeben und kann jetzt gebucht werden."
+            return "Rechnung wurde bereits gebucht. Keine Aktion notwendig."
+        return "Rechnung wurde genehmigt und kann jetzt gebucht werden."
 
-    def is_invoice_already_booked(self, rechnungsnummer: str) -> bool:
+    def is_already_booked(self, invoice_number):
         conn = sqlite3.connect(ARCHIVE_DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM archive WHERE rechnungsnummer = ?", (rechnungsnummer,))
+        cursor.execute("SELECT COUNT(*) FROM archive WHERE rechnungsnummer = ?", (invoice_number,))
         count = cursor.fetchone()[0]
         conn.close()
         return count > 0
 
-    def extract_amount_from_llm(self) -> float:
-        prompt = f"""
-Du erhältst eine strukturierte Rechnung im Markdown-Format.
+    def extract_invoice_number(self):
+        match = re.search(r"\| 6\. Fortlaufende Rechnungsnummer \|\s*Ja\s*\|\s*(.*?)\s*\|", self.validation_text)
+        return match.group(1).strip() if match else "UNBEKANNT"
 
-Deine Aufgabe:
-Gib ausschließlich den Bruttobetrag der Rechnung zurück – als Zahl mit Punkt (z. B. 2915.50).
-Keine Einheiten, keine Zusatztexte.
-
-Rechnung:
-{self.validation_text}
-
-Antwortformat:
-[Nur Betrag, z. B.: 2915.50]
-"""
-        response = self.llm.invoke(prompt).strip()
-        try:
-            return float(response.replace(",", "."))
-        except ValueError:
-            print("[WARNUNG] Betrag konnte nicht extrahiert werden:", response)
-            return 0.0
+    def extract_amount(self):
+        match = re.search(r"Brutto.*?([\d.,]+)", self.validation_text.replace("\n", " "))
+        if match:
+            try:
+                return float(match.group(1).replace(".", "").replace(",", "."))
+            except:
+                pass
+        return 0.0
 
     def action(self):
-        gedanke = self.think()
-        validation = self.data.get("validation", "")
+        print("BookingAgent Think():", self.think())
+        invoice_number = self.extract_invoice_number()
 
-        # Rechnungsnummer extrahieren
-        match_nr = re.search(r"\|6\. Fortlaufende Rechnungsnummer\s*\|\s*Ja\s*\|\s*(.*?)\s*\|", validation)
-        rechnungsnummer = match_nr.group(1).strip() if match_nr else "UNBEKANNT"
-
-        # Prüfen, ob bereits gebucht
-        if self.is_invoice_already_booked(rechnungsnummer):
-            result = f"Buchung abgebrochen - Rechnung {rechnungsnummer} wurde bereits gebucht."
-            self.data["booking"] = result
+        if self.is_already_booked(invoice_number):
+            msg = f"Buchung abgebrochen - Rechnung {invoice_number} wurde bereits gebucht."
+            self.data["booking"] = msg
             self.data["booking_status"] = "abgebrochen"
-            self._save()
-            return result
+        else:
+            amount = self.extract_amount()
+            self.data["booking_amount"] = amount
 
-        # Betrag per LLM extrahieren
-        betrag = self.extract_amount_from_llm()
-        self.data["booking_amount"] = betrag
+            prompt = self.prompt(amount)
+            booking_text = self.llm.invoke(prompt).strip()
 
-        # Kostenstelle extrahieren
-        kostenstelle = self.data.get("accounting", "Unbekannt")
+            self.data["booking"] = booking_text
+            self.data["booking_status"] = "gebucht"
 
-        # Prompt zur Buchung
-        buchung_prompt = f"""
-Du bist ein Buchhaltungs-Agent. Dein Ziel: Simuliere die Buchung der Rechnung.
-
-Rechnungsdaten:
-- Kostenstelle: {kostenstelle}
-- Betrag brutto: {betrag} EUR
-
-Gib folgenden Satz exakt aus:
-Buchung erfolgt: [Betrag im Format 1234.56] EUR auf [Kostenstelle] - Status: gebucht
-"""
-        buchung_text = self.llm.invoke(buchung_prompt).strip()
-        buchung_text = buchung_text.replace(",", ".")  # <- erzwinge Punktnotation
-
-
-        # Ergebnisse speichern
-        self.data["booking"] = buchung_text
-        self.data["booking_status"] = "gebucht"
-        self._save()
-
-        return buchung_text
-
-    def _save(self):
-        with open(self.path, "w", encoding="utf-8") as f:
+        with open(self.result_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
+
+        print("BookingAgent Action():", self.data["booking"])
+        return self.data["booking"]

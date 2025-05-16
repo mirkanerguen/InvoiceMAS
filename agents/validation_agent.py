@@ -1,129 +1,58 @@
-import re
-import pandas as pd
+import json
 from langchain_community.llms import Ollama
-from langchain.prompts import PromptTemplate
 from utils.pdf_parser import extract_text_from_pdf
-from config import OLLAMA_MODEL
+from config import RESULTS_PATH, OLLAMA_MODEL
 
 class ValidationAgent:
     def __init__(self, pdf_path):
         self.pdf_path = pdf_path
-        self.invoice_text = extract_text_from_pdf(pdf_path)
         self.llm = Ollama(model=OLLAMA_MODEL)
+        self.text = extract_text_from_pdf(pdf_path)
+
+        # Lade bestehende Ergebnisse
+        try:
+            with open(RESULTS_PATH, "r", encoding="utf-8") as f:
+                self.results = json.load(f)
+        except FileNotFoundError:
+            self.results = {}
 
     def goal(self):
-        return "Alle Pflichtangaben gemäß §14 UStG müssen vorhanden und korrekt extrahiert sein."
+        return "Extrahiere und überprüfe die 12 Pflichtangaben gemäß §14 Abs. 4 UStG aus einer Rechnung."
 
     def prompt(self):
-        return PromptTemplate(
-            input_variables=["invoice_text", "agent_thoughts"],
-            template="""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
+        return f"""
+Du bist ein Validation-Agent. Deine Aufgabe ist es, aus folgendem Rechnungstext die 12 Pflichtangaben gemäß §14 Abs. 4 UStG zu prüfen und zu extrahieren.
 
-Deine aktuellen Gedanken sind: {agent_thoughts}
-
-Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
-Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
-
-Achte ganz genau darauf, wer der leistende Unternehmer und wer der Leistungsempfänger ist, und ordne die Namen und Anschriften exakt korrekt zu!
-
-Generiere exakt diese Tabelle im Markdown-Format (Jede Tabellenzeile unbedingt mit Zeilenumbruch, KEINE Zeilenumbrüche innerhalb einer Zeile!):
-
+**Gib die Antwort ausschließlich in folgender Markdown-Tabelle zurück:**
 | Pflichtangabe | Vorhanden | Extrahierter Wert |
 |---------------|-----------|-------------------|
-| 1. Name & Anschrift des leistenden Unternehmers | Ja/Nein | Nur Name und Anschrift |
-| 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | Nur Name und Anschrift |
-| 3. Steuernummer des Unternehmers | Ja/Nein | Nur die Steuernummer |
-| 4. Umsatzsteuer-ID des Unternehmers | Ja/Nein | Nur die Umsatzsteuer-ID |
-| 5. Ausstellungsdatum | Ja/Nein | Datum |
-| 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
-| 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
-| 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
-| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Netto-, Bruttobetrag, Steuerbetrag |
-| 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
-| 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
-| 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
+| 1. Name & Anschrift des leistenden Unternehmers | Ja/Nein | ... |
+| 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | ... |
+| 3. Steuernummer des Unternehmers | Ja/Nein | ... |
+| 4. Umsatzsteuer-ID des Unternehmers | Ja/Nein | ... |
+| 5. Ausstellungsdatum | Ja/Nein | ... |
+| 6. Fortlaufende Rechnungsnummer | Ja/Nein | ... |
+| 7. Menge und Art der gelieferten Leistung | Ja/Nein | ... |
+| 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | ... |
+| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | ... |
+| 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | ... |
+| 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | ... |
+| 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | ... |
 
 Rechnungstext:
-{invoice_text}
+{self.text}
 """
-        )
 
     def think(self):
-        thought_prompt = PromptTemplate(
-            input_variables=["invoice_text", "goal"],
-            template="""Du bist ein intelligenter KI-Agent, der eine Rechnung prüft.
+        print("ValidationAgent: LLM wird mit Prompt versorgt...")
+        return self.llm.invoke(self.prompt()).strip()
 
-Dein Ziel lautet: {goal}
+    def action(self):
+        result_table = self.think()
+        self.results["validation"] = result_table
 
-Analysiere kurz den Rechnungstext und beschreibe in einem Satz, was dein nächster Schritt ist, um das Ziel zu erreichen.
+        with open(RESULTS_PATH, "w", encoding="utf-8") as f:
+            json.dump(self.results, f, indent=4)
 
-Rechnungstext: {invoice_text}
-
-Antworte kurz und präzise mit einem Satz."""
-        )
-
-        formatted_thought_prompt = thought_prompt.format(
-            invoice_text=self.invoice_text,
-            goal=self.goal()
-        )
-
-        agent_thoughts = self.llm.invoke(formatted_thought_prompt)
-        print(f"ValidationAgent Think(): {agent_thoughts}")
-        return agent_thoughts.strip()
-
-    def action(self, agent_thoughts, custom_prompt=None):
-        if custom_prompt:
-            formatted_prompt = custom_prompt
-        else:
-            formatted_prompt = self.prompt().format(
-                invoice_text=self.invoice_text,
-                agent_thoughts=agent_thoughts
-            )
-
-        result = self.llm.invoke(formatted_prompt).strip()
-
-        # Extrahiere nur gültige Tabellenzeilen mit Pflichtangaben (1.–12.)
-        lines = result.splitlines()
-        table_lines = [line for line in lines if re.match(r"\|\s*(\d+\.)", line)]
-        header_lines = [line for line in lines if line.strip().startswith("| Pflichtangabe") or "---" in line]
-
-        if not table_lines or not header_lines:
-            print("Warnung: Tabelle konnte nicht zuverlässig extrahiert werden.")
-            return result  # Fallback: gib Original zurück
-
-        # Rekonstruiere finale Tabelle
-        clean_result = "\n".join(header_lines + table_lines)
-        print("ValidationAgent Action(): Daten extrahiert.")
-        return clean_result
-
-
-    def run(self):
-        thoughts = self.think()
-        return self.action(thoughts)
-
-    def run_with_prompt(self, improved_prompt):
-        thoughts = self.think()
-        return self.action(thoughts, custom_prompt=improved_prompt)
-
-    def run_with_user_input(self, missing_info):
-        user_input_prompt = self.prompt().format(
-            invoice_text=f"{self.invoice_text}\n\nVom User ergänzte Information: {missing_info}",
-            agent_thoughts="Der User hat die fehlende Information ergänzt."
-        )
-        return self.action("User-ergänzte Eingabe", custom_prompt=user_input_prompt)
-
-    def to_dataframe(self, markdown_table):
-        pattern = r"\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|"
-        matches = re.findall(pattern, markdown_table)
-
-        if not matches or len(matches) < 2:
-            raise ValueError(f"Ungültige Tabelle erhalten:\n{markdown_table}")
-
-        header = [col.strip() for col in matches[0]]
-        data_rows = [
-            [col.strip() for col in row]
-            for row in matches[1:]
-            if "---" not in row[0] and row[0] != ""
-        ]
-
-        return pd.DataFrame(data_rows, columns=header)
+        print("ValidationAgent: Ergebnis in results.json gespeichert.")
+        return result_table

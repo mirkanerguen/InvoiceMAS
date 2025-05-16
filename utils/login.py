@@ -9,17 +9,23 @@ def check_credentials(username: str, password: str, role: str = None) -> bool:
         print(f"Fehler beim Laden der Login-Daten: {e}")
         return False
 
+    role_map = {
+        "employee": "Mitarbeiter",
+        "teamlead": "Teamleiter",
+        "departmentlead": "Abteilungsleiter",
+        "manager": "Manager"
+    }
+    expected_role_label = role_map.get(role, role)
+
     for user in users:
         if user.get("username") == username and user.get("password") == password:
-            user_role = user.get("role", "").strip().lower()
-            if role is None:
-                print(f"[DEBUG] Login akzeptiert ohne Rollenzwang ({username})")
-                return True
-            if user_role == role.lower():
+            user_role = user.get("role", "").strip()
+            if role is None or user_role == expected_role_label:
                 print(f"[DEBUG] Login akzeptiert ({username}, Rolle: {user_role})")
                 return True
             else:
-                print(f"[DEBUG] Login abgelehnt - falsche Rolle: erwartet '{role}', aber war '{user_role}'")
+                print(f"[DEBUG] Login abgelehnt - falsche Rolle: erwartet '{expected_role_label}', aber war '{user_role}'")
                 return False
+
     print(f"[DEBUG] Login abgelehnt - Benutzername oder Passwort falsch")
     return False

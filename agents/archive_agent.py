@@ -1,91 +1,76 @@
+import json
 import os
 import shutil
-import json
-import sqlite3
 from datetime import datetime
-from config import ARCHIVE_DIR, ARCHIVE_DB_PATH
+from config import RESULTS_PATH
+from langchain_community.llms import Ollama
 
 class ArchiveAgent:
-    def __init__(self, intermediate_path, original_pdf_path,
-                 archive_dir=ARCHIVE_DIR, db_path=ARCHIVE_DB_PATH):
-        self.intermediate_path = intermediate_path
-        self.original_pdf_path = original_pdf_path
-        self.archive_dir = archive_dir
-        self.db_path = db_path
+    def __init__(self, result_path=RESULTS_PATH, pdf_path=None):
+        self.result_path = result_path
+        self.pdf_path = pdf_path
+        self.llm = Ollama(model="mistral")
 
-        os.makedirs(self.archive_dir, exist_ok=True)
-        self._init_db()
+        with open(self.result_path, "r", encoding="utf-8") as f:
+            self.data = json.load(f)
 
     def goal(self):
-        return "Speichere das abgeschlossene Ergebnis dauerhaft ab, damit es revisionssicher archiviert ist."
+        return "Archivierung der gebuchten Rechnung mit nachvollziehbarem Dateinamen im Archivordner."
+
+    def prompt(self, invoice_number, booking_status):
+        return f"""
+Du bist ein Archivierungs-Agent. Die Rechnung mit der Nummer {invoice_number} wurde {booking_status}.
+
+Deine Aufgabe:
+Bestimme, ob die Rechnung archiviert werden darf. Gib nur "ja" oder "nein" zurück.
+"""
 
     def think(self):
-        print("ArchiveAgent Think(): Lade Daten und bereite Archivierung vor.")
-        with open(self.intermediate_path, "r", encoding="utf-8") as f:
-            self.results = json.load(f)
-        return self.results
+        return "Wenn die Buchung erfolgreich war, darf archiviert werden."
+
+    def extract_invoice_number(self):
+        match = None
+        if "validation" in self.data:
+            import re
+            match = re.search(r"\| 6\. Fortlaufende Rechnungsnummer \|\s*Ja\s*\|\s*(.*?)\s*\|", self.data["validation"])
+        return match.group(1).strip() if match else "UNBEKANNT"
 
     def action(self):
-        data = self.think()
+        print("ArchiveAgent Think():", self.think())
 
-        # Rechnungsnummer extrahieren
-        validation_table = data.get("validation", "")
-        rechnungsnummer = self._extract_field(validation_table, "6. Fortlaufende Rechnungsnummer") or "unknown"
-        rechnungsnummer = rechnungsnummer.replace(":", "").replace("/", "").replace("\\", "").strip()
+        invoice_number = self.extract_invoice_number()
+        booking_status = self.data.get("booking_status", "").lower()
 
-        # Prüfen auf bereits archiviert
-        if self.is_already_archived(rechnungsnummer):
-            return f"Archivierung abgebrochen – Rechnung {rechnungsnummer} wurde bereits archiviert."
+        decision = self.llm.invoke(self.prompt(invoice_number, booking_status)).strip().lower()
+        if decision != "ja":
+            self.data["archive"] = "Archivierung übersprungen durch KI-Entscheidung."
+            self.data["archived"] = False
+            print("ArchiveAgent: Archivierung verweigert.")
+            self._save()
+            return self.data["archive"]
 
-        # Ordnername mit Zeitstempel
+        # Archivordner vorbereiten
+        archive_dir = "archive"
+        os.makedirs(archive_dir, exist_ok=True)
+
+        # Dateiname generieren
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        folder_name = f"{rechnungsnummer}_{timestamp}"
-        folder_path = os.path.join(self.archive_dir, folder_name)
-        os.makedirs(folder_path, exist_ok=True)
+        filename = f"{invoice_number}_{timestamp}.pdf"
+        archive_path = os.path.join(archive_dir, filename)
 
-        # Dateien kopieren
-        shutil.copy(self.intermediate_path, os.path.join(folder_path, "results.json"))
-        shutil.copy(self.original_pdf_path, os.path.join(folder_path, "invoice.pdf"))
+        # PDF kopieren
+        if self.pdf_path and os.path.exists(self.pdf_path):
+            shutil.copy2(self.pdf_path, archive_path)
+            self.data["archive"] = f"Archiviert unter: {archive_path}"
+            self.data["archived"] = True
+        else:
+            self.data["archive"] = "PDF-Datei nicht gefunden – Archivierung fehlgeschlagen."
+            self.data["archived"] = False
 
-        # DB-Eintrag
-        self._save_to_db(rechnungsnummer, folder_path)
+        print("ArchiveAgent Action():", self.data["archive"])
+        self._save()
+        return self.data["archive"]
 
-        return f"Archiviert unter: {folder_path}"
-
-    def _extract_field(self, markdown_table, label):
-        import re
-        pattern = fr"\|\s*{label}.*?\|\s*(Ja|Nein|Fehlt)\s*\|\s*(.*?)\|"
-        match = re.search(pattern, markdown_table.replace("\n", " "))
-        return match.group(2).strip() if match else None
-
-    def _init_db(self):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS archive (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rechnungsnummer TEXT,
-                archiviert_am TEXT,
-                pfad TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
-
-    def is_already_archived(self, rechnungsnummer):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM archive WHERE rechnungsnummer = ?", (rechnungsnummer,))
-        count = c.fetchone()[0]
-        conn.close()
-        return count > 0
-
-    def _save_to_db(self, rechnungsnummer, pfad):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO archive (rechnungsnummer, archiviert_am, pfad) VALUES (?, ?, ?)",
-            (rechnungsnummer, datetime.now().isoformat(), pfad)
-        )
-        conn.commit()
-        conn.close()
+    def _save(self):
+        with open(self.result_path, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, indent=4)
