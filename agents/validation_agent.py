@@ -80,15 +80,22 @@ Antworte kurz und präzise mit einem Satz."""
                 agent_thoughts=agent_thoughts
             )
 
-        result = self.llm.invoke(formatted_prompt)
+        result = self.llm.invoke(formatted_prompt).strip()
 
-        # Robuste Umwandlung des LLM-Outputs in Tabellenformat
-        result = result.replace("\n", " ")
-        result = re.sub(r"\|\s*(\d+\.)", r"\n|\1", result)
+        # Extrahiere nur gültige Tabellenzeilen mit Pflichtangaben (1.–12.)
+        lines = result.splitlines()
+        table_lines = [line for line in lines if re.match(r"\|\s*(\d+\.)", line)]
+        header_lines = [line for line in lines if line.strip().startswith("| Pflichtangabe") or "---" in line]
 
-        clean_result = result.strip()
+        if not table_lines or not header_lines:
+            print("Warnung: Tabelle konnte nicht zuverlässig extrahiert werden.")
+            return result  # Fallback: gib Original zurück
+
+        # Rekonstruiere finale Tabelle
+        clean_result = "\n".join(header_lines + table_lines)
         print("ValidationAgent Action(): Daten extrahiert.")
         return clean_result
+
 
     def run(self):
         thoughts = self.think()

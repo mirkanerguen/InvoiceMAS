@@ -19,7 +19,7 @@ def check_credentials(username: str, password: str, role: str = None) -> bool:
                 print(f"[DEBUG] Login akzeptiert ({username}, Rolle: {user_role})")
                 return True
             else:
-                print(f"[DEBUG] Login abgelehnt – falsche Rolle: erwartet '{role}', aber war '{user_role}'")
+                print(f"[DEBUG] Login abgelehnt - falsche Rolle: erwartet '{role}', aber war '{user_role}'")
                 return False
-    print(f"[DEBUG] Login abgelehnt – Benutzername oder Passwort falsch")
+    print(f"[DEBUG] Login abgelehnt - Benutzername oder Passwort falsch")
     return False

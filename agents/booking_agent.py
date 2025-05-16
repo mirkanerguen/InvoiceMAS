@@ -12,6 +12,8 @@ class BookingAgent:
         with open(self.path, "r", encoding="utf-8") as f:
             self.data = json.load(f)
 
+        self.validation_text = self.data.get("validation", "")
+
     def goal(self):
         return "Führe die Buchung der freigegebenen Rechnung durch und kennzeichne sie als gebucht."
 
@@ -28,6 +30,27 @@ class BookingAgent:
         conn.close()
         return count > 0
 
+    def extract_amount_from_llm(self) -> float:
+        prompt = f"""
+Du erhältst eine strukturierte Rechnung im Markdown-Format.
+
+Deine Aufgabe:
+Gib ausschließlich den Bruttobetrag der Rechnung zurück – als Zahl mit Punkt (z. B. 2915.50).
+Keine Einheiten, keine Zusatztexte.
+
+Rechnung:
+{self.validation_text}
+
+Antwortformat:
+[Nur Betrag, z. B.: 2915.50]
+"""
+        response = self.llm.invoke(prompt).strip()
+        try:
+            return float(response.replace(",", "."))
+        except ValueError:
+            print("[WARNUNG] Betrag konnte nicht extrahiert werden:", response)
+            return 0.0
+
     def action(self):
         gedanke = self.think()
         validation = self.data.get("validation", "")
@@ -36,7 +59,7 @@ class BookingAgent:
         match_nr = re.search(r"\|6\. Fortlaufende Rechnungsnummer\s*\|\s*Ja\s*\|\s*(.*?)\s*\|", validation)
         rechnungsnummer = match_nr.group(1).strip() if match_nr else "UNBEKANNT"
 
-        # Prüfen, ob bereits gebucht (über Datenbank)
+        # Prüfen, ob bereits gebucht
         if self.is_invoice_already_booked(rechnungsnummer):
             result = f"Buchung abgebrochen - Rechnung {rechnungsnummer} wurde bereits gebucht."
             self.data["booking"] = result
@@ -44,12 +67,14 @@ class BookingAgent:
             self._save()
             return result
 
-        # Kostenstelle und Betrag extrahieren
-        kostenstelle = self.data.get("accounting", "Unbekannt")
-        match_betrag = re.search(r"Brutto[: ]*([\d\.,]+)", validation.replace("\n", " "))
-        betrag = match_betrag.group(1).replace(".", "").replace(",", ".") if match_betrag else "0.00"
+        # Betrag per LLM extrahieren
+        betrag = self.extract_amount_from_llm()
+        self.data["booking_amount"] = betrag
 
-        # Prompt zur simulierten Buchung
+        # Kostenstelle extrahieren
+        kostenstelle = self.data.get("accounting", "Unbekannt")
+
+        # Prompt zur Buchung
         buchung_prompt = f"""
 Du bist ein Buchhaltungs-Agent. Dein Ziel: Simuliere die Buchung der Rechnung.
 

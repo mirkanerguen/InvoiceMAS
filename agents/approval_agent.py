@@ -53,48 +53,36 @@ Antwort (nur Zahl):
         if decision_code == "1":
             result = "Genehmigt - Rolle: Mitarbeiter"
             status = "genehmigt"
+            self.data["expected_role"] = "employee"
 
         elif decision_code == "2":
-            print(f"Login {TEAMLEITER_ROLE}:")
-            username = input("Benutzername: ")
-            password = input("Passwort: ")
-            if check_credentials(username, password, TEAMLEITER_ROLE):
-                result = f"Genehmigt - Rolle: {TEAMLEITER_ROLE}"
-                status = "genehmigt"
-            else:
-                result = "Login fehlgeschlagen - Genehmigung verweigert"
-                status = "verweigert"
-                self._save_result(result, status)
-                return result 
-
+            result = "Genehmigt - Rolle: Teamleiter"
+            status = "genehmigt"
+            self.data["expected_role"] = TEAMLEITER_ROLE  # "teamlead"
 
         elif decision_code == "3":
-            print(f"Login {ABTEILUNGSLEITER_ROLE}:")
-            username = input("Benutzername: ")
-            password = input("Passwort: ")
-            if check_credentials(username, password, ABTEILUNGSLEITER_ROLE):
-                result = f"Genehmigt - Rolle: {ABTEILUNGSLEITER_ROLE}"
-                status = "genehmigt"
-            else:
-                result = "Login fehlgeschlagen - Genehmigung verweigert"
-                status = "verweigert"
-                self._save_result(result, status)
-                return result  # Early return
+            result = "Genehmigt - Rolle: Abteilungsleiter"
+            status = "genehmigt"
+            self.data["expected_role"] = ABTEILUNGSLEITER_ROLE  # "departmentlead"
 
         elif decision_code == "0":
             result = "Genehmigung verweigert"
             status = "verweigert"
 
-        # Ergebnisse speichern
         self._save_result(result, status)
         return result
 
-    def _save_result(self, result, status):
+    def _save_result(self, result, status, user=None, amount=None):
         self.data["approval"] = result
         self.data["approval_status"] = status
+        if user:
+            self.data["approved_by"] = user
+        if amount:
+            self.data["approved_amount"] = amount
         with open(self.result_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
         print("ApprovalAgent: Entscheidung gespeichert.")
+
 
     def run(self):
         decision = self.think()
