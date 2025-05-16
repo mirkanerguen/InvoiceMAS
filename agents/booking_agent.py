@@ -83,9 +83,11 @@ Rechnungsdaten:
 - Betrag brutto: {betrag} EUR
 
 Gib folgenden Satz exakt aus:
-Buchung erfolgt: [Betrag] EUR auf [Kostenstelle] - Status: gebucht
+Buchung erfolgt: [Betrag im Format 1234.56] EUR auf [Kostenstelle] - Status: gebucht
 """
         buchung_text = self.llm.invoke(buchung_prompt).strip()
+        buchung_text = buchung_text.replace(",", ".")  # <- erzwinge Punktnotation
+
 
         # Ergebnisse speichern
         self.data["booking"] = buchung_text

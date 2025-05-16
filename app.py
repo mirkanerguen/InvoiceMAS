@@ -1,6 +1,5 @@
 import streamlit as st
 from agents.supervisor_agent import SupervisorAgent
-from agents.approval_agent import ApprovalAgent
 from config import RESULTS_PATH, ARCHIVE_DB_PATH
 import tempfile
 import pandas as pd
@@ -11,6 +10,7 @@ from utils.login import check_credentials
 
 st.title("Invoice-Workflow MAS")
 
+# Session-State initialisieren
 if "workflow_done" not in st.session_state:
     st.session_state["workflow_done"] = False
 if "sachlich_entscheidung" not in st.session_state:
@@ -18,6 +18,7 @@ if "sachlich_entscheidung" not in st.session_state:
 if "login_erlaubt" not in st.session_state:
     st.session_state["login_erlaubt"] = False
 
+# PDF Upload
 uploaded_pdf = st.file_uploader("Rechnung hochladen (PDF)", type="pdf")
 
 if uploaded_pdf:
@@ -37,7 +38,7 @@ if uploaded_pdf:
         with open(RESULTS_PATH, "r", encoding="utf-8") as f:
             results = json.load(f)
 
-        # Benutzerinteraktion (nach CheckAgent)
+        # Benutzerinteraktion nach sachlicher Prüfung
         if results.get("flag_wait_for_user_decision"):
             st.warning("Supervisor wartet auf Ihre Entscheidung.")
 
@@ -85,20 +86,15 @@ if uploaded_pdf:
                         st.error("Login fehlgeschlagen.")
                         st.stop()
 
-        # 1. Formelle Prüfung
-        validation_result = results.get("validation", "")
+        # 1. Formelle Prüfung anzeigen
         st.markdown("### Ergebnis der formellen Prüfung:")
-        if "|" in validation_result:
-            matches = re.findall(r'\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|', validation_result)
-            if matches:
-                header = [col.strip() for col in matches[0]]
-                data_rows = [
-                    [col.strip() for col in row]
-                    for row in matches[1:]
-                    if "---" not in row[0] and row[0] != ""
-                ]
-                df_validation = pd.DataFrame(data_rows, columns=header)
-                st.dataframe(df_validation, use_container_width=True)
+        validation_result = results.get("validation", "")
+        matches = re.findall(r"\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|", validation_result)
+        if matches:
+            df_validation = pd.DataFrame(matches[1:], columns=matches[0])
+            st.dataframe(df_validation, use_container_width=True)
+        else:
+            st.info("Keine gültige Tabelle aus der formellen Prüfung extrahierbar.")
 
         # 2. Kostenstelle
         st.markdown("### Ergebnis der Kostenstellen-Zuordnung:")
@@ -134,25 +130,27 @@ if uploaded_pdf:
 
         # 5. Buchung
         st.markdown("### Ergebnis der Buchung:")
-        booking_status = results.get("booking_status", "").lower()
         booking_text = results.get("booking", "")
+        booking_status = results.get("booking_status", "").lower()
 
-        if "gebucht" in booking_status:
+        if booking_status == "gebucht":
             st.success(booking_text)
-        elif "abgebrochen" in booking_status:
+        elif booking_status == "abgebrochen":
             st.warning(booking_text)
-        elif "offen" in booking_status:
+        elif booking_status == "offen":
             st.info("Noch keine Buchung erfolgt.")
         else:
-            st.error("Unbekannter Buchungsstatus.")
-
+            st.info(booking_text if booking_text else "Unbekannter Buchungsstatus.")
 
         # 6. Archivierung
         st.markdown("### Archivierung:")
-        archive_info = results.get("archive", "Keine Archivierungsinformationen.")
-        st.info(archive_info)
+        archive_info = results.get("archive", "")
+        if archive_info and "Archiviert unter" in archive_info:
+            st.success(archive_info)
+        else:
+            st.info("Keine Archivierungsinformationen.")
 
-        # 7. Historie (Archivierte Rechnungen)
+        # 7. Historie
         st.markdown("### Archivierte Rechnungen:")
         conn = sqlite3.connect(ARCHIVE_DB_PATH)
         df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
