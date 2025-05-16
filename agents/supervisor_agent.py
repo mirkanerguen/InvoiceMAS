@@ -93,7 +93,13 @@ class SupervisorAgent:
         from agents.booking_agent import BookingAgent
         booking_agent = BookingAgent(RESULTS_PATH)
         booking_result = booking_agent.action()
+
+        # Komplettes JSON übernehmen, nicht nur den Text
+        with open(RESULTS_PATH, "r", encoding="utf-8") as f:
+            updated_results = json.load(f)
+        self.results = updated_results
         self.save_intermediate_result("booking", booking_result)
+
 
         if self.get_booking_status() == "abgebrochen":
             print("SupervisorAgent: Rechnung bereits gebucht - Archivierung wird übersprungen.")

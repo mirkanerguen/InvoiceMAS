@@ -15,7 +15,7 @@ def hard_match_check(extracted, known):
     extr_rn = normalize(extracted.get("rechnungsnummer", ""))
     extr_lieferant = normalize(extracted.get("lieferant", ""))
     extr_leistung = normalize(extracted.get("leistung", ""))
-    extr_betrag_raw = extracted.get("betrag", "")
+    extr_betrag_raw = str(extracted.get("betrag", ""))
     match = re.search(r"Brutto[: ]*([\d\.,]+)", extr_betrag_raw)
     extr_betrag = float(match.group(1).replace(",", ".").replace("€", "")) if match else 0.0
 

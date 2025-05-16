@@ -8,6 +8,5 @@
     "expected_role": "Teamleiter",
     "booking_amount": 2960.5,
     "booking": "Buchung erfolgt: 2960.50 EUR auf 1001-Beratung - Status: gebucht",
-    "booking_status": "gebucht",
-    "archive": "Archiviert unter: archive\\R-1321321_20250516_161354"
+    "booking_status": "gebucht"
 }
