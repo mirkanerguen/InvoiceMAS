@@ -1,8 +1,7 @@
 import json
-import re
 from langchain_community.llms import Ollama
-from config import RESULTS_PATH, CREDENTIALS_PATH, OLLAMA_MODEL
-from utils.approval_rules import APPROVAL_RULES
+from utils.login import check_credentials
+from config import OLLAMA_MODEL, RESULTS_PATH, TEAMLEITER_ROLE, ABTEILUNGSLEITER_ROLE
 
 class ApprovalAgent:
     def __init__(self, result_path=RESULTS_PATH):
@@ -15,94 +14,78 @@ class ApprovalAgent:
         self.validation_text = self.data.get("validation", "")
 
     def goal(self):
-        return "Bestimme anhand des Bruttobetrags die benötigte Genehmigungsrolle und führe einen Login entsprechend durch."
-
-    def prompt(self):
-        return f"""
-Du bist ein intelligenter Approval-Agent.
-
-Dein Ziel: Extrahiere den Bruttobetrag aus folgender Rechnung.
-Antworte nur mit einer Zahl (Beispiel: 2915.50)
-
-Rechnungsdaten:
-{self.validation_text}
-"""
+        return (
+            "Bestimme anhand des Bruttobetrags in einer Rechnung, "
+            "welche hierarchische Rolle (Mitarbeiter, Teamleiter, Abteilungsleiter) "
+            "die Genehmigung erteilen muss. Entscheide selbstständig, ob eine Freigabe möglich ist."
+        )
 
     def think(self):
-        print("ApprovalAgent Think(): Bruttobetrag wird per LLM extrahiert...")
-        response = self.llm.invoke(self.prompt()).strip()
-        try:
-            betrag = float(response.replace(",", "."))
-            print(f"Extrahierter Betrag: {betrag}")
-            return betrag
-        except ValueError:
-            print("[WARNUNG] Betrag konnte nicht interpretiert werden:", response)
-            return 0.0
+        goal_text = self.goal()
 
-    def get_required_role(self, betrag):
-        for role, limit in APPROVAL_RULES.items():
-            if betrag <= limit:
-                return role
-        return "manager"
+        full_prompt = f"""
+Du bist ein autonomer Freigabe-Agent.
 
-    def login_prompt(self, role):
-        return f"""
-Du bist nun im Login-Modus.
+Dein Ziel lautet:
+„{goal_text}“
 
-Genehmigung erforderlich durch: {self._display_role(role)}
+Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0-3)** zurück, die deine Entscheidung darstellt:
 
-Bitte gib Benutzername und Passwort ein.
+1 = Genehmigung durch Mitarbeiter (bis 500 €)  
+2 = Genehmigung durch Teamleiter (501-5.000 €)  
+3 = Genehmigung durch Abteilungsleiter (ab 5.001 €)  
+0 = Genehmigung verweigern
+
+Rechnungsauszug:
+{self.validation_text}
+
+Antwort (nur Zahl): 
 """
+        print("ApprovalAgent Think(): Ziel definiert und Prompt gesendet.")
+        response = self.llm.invoke(full_prompt).strip()
+        print("ApprovalAgent Entscheidung:", response)
+        return response
 
-    def _display_role(self, role):
-        return {
-            "employee": "Mitarbeiter",
-            "teamlead": "Teamleiter",
-            "departmentlead": "Abteilungsleiter",
-            "manager": "Manager"
-        }.get(role, role)
+    def action(self, decision_code):
+        result = "Unbekannter Entscheidungswert"
+        status = "offen"
 
-    def validate_login(self, username, password, expected_role):
-        try:
-            with open(CREDENTIALS_PATH, "r", encoding="utf-8") as f:
-                users = json.load(f).get("users", [])
-        except Exception as e:
-            print(f"Fehler beim Laden der Login-Daten: {e}")
-            return False
-
-        for user in users:
-            if user.get("username") == username and user.get("password") == password:
-                print(f"[DEBUG] Login akzeptiert ({username})")
-                return True
-        print("[DEBUG] Login fehlgeschlagen.")
-        return False
-
-    def action(self):
-        betrag = self.think()
-        role = self.get_required_role(betrag)
-        self.data["expected_role"] = role
-        self.data["approval_amount"] = betrag
-
-        # Simulierter Login (z. B. durch UI)
-        print(self.login_prompt(role))
-        username = input("Benutzername: ")
-        password = input("Passwort: ")
-
-        if self.validate_login(username, password, role):
-            result = f"Genehmigt - Rolle: {self._display_role(role)}"
+        if decision_code == "1":
+            result = "Genehmigt - Rolle: Mitarbeiter"
             status = "genehmigt"
-            self.data["approval"] = result
-            self.data["approval_status"] = status
-            self.data["approved_by"] = username
-            print("ApprovalAgent: Genehmigung erfolgreich.")
-        else:
+
+        elif decision_code == "2":
+            print(f"Login {TEAMLEITER_ROLE}:")
+            if check_credentials(input("Benutzername: "), input("Passwort: ")):
+                result = f"Genehmigt - Rolle: {TEAMLEITER_ROLE}"
+                status = "genehmigt"
+            else:
+                result = "Login fehlgeschlagen - Genehmigung verweigert"
+                status = "verweigert"
+
+        elif decision_code == "3":
+            print(f"Login {ABTEILUNGSLEITER_ROLE}:")
+            if check_credentials(input("Benutzername: "), input("Passwort: ")):
+                result = f"Genehmigt - Rolle: {ABTEILUNGSLEITER_ROLE}"
+                status = "genehmigt"
+            else:
+                result = "Login fehlgeschlagen - Genehmigung verweigert"
+                status = "verweigert"
+
+        elif decision_code == "0":
             result = "Genehmigung verweigert"
             status = "verweigert"
-            self.data["approval"] = result
-            self.data["approval_status"] = status
-            print("ApprovalAgent: Genehmigung verweigert.")
+
+        # Ergebnisse speichern
+        self.data["approval"] = result
+        self.data["approval_status"] = status
 
         with open(self.result_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
 
-        return self.data["approval"]
+        print("ApprovalAgent: Entscheidung gespeichert.")
+        return result
+
+    def run(self):
+        decision = self.think()
+        return self.action(decision)

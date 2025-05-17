@@ -1,75 +1,64 @@
 import json
 import re
-from config import RESULTS_PATH
-from utils.cost_center import COST_CENTER_RULES, DEFAULT_COST_CENTER
 from langchain_community.llms import Ollama
+from langchain.prompts import PromptTemplate
+from config import OLLAMA_MODEL, RESULTS_PATH
+from utils.cost_center import COST_CENTER_RULES, DEFAULT_COST_CENTER
 
 class AccountingAgent:
-    def __init__(self, result_path=RESULTS_PATH):
-        self.path = result_path
-        self.llm = Ollama(model="mistral")
-        with open(self.path, "r", encoding="utf-8") as f:
-            self.data = json.load(f)
+    def __init__(self, validation_result_path=RESULTS_PATH):
+        self.llm = Ollama(model=OLLAMA_MODEL)
+        with open(validation_result_path, "r", encoding="utf-8") as file:
+            self.data = json.load(file).get("validation", "")
 
     def goal(self):
-        return "Ordne der Rechnung eine passende Kostenstelle zu."
-
-    def prompt(self):
-        leistung = self._get_leistung()
-        return f"""
-Du bist ein Accounting-Agent.
-
-Ordne basierend auf folgender Leistungsbeschreibung eine passende Kostenstelle zu.
-
-Leistung: {leistung}
-
-Bekannte Kostenstellen:
-- 1001-Beratung
-- 1002-IT
-- 1003-Marketing
-- 1004-Beschaffung
-- 1005-Personal
-- 1099-Sonstiges
-
-Gib **nur** die Kostenstelle zurück (z. B. 1003-Marketing).
-"""
-
-    def _get_leistung(self):
-        try:
-            table = self.data.get("validation", "")
-            for line in table.splitlines():
-                if "7." in line:
-                    return line.split("|")[-1].strip()
-        except Exception as e:
-            print("[AccountingAgent] Fehler bei Leistungs-Extraktion:", e)
-        return ""
+        return "Weise die Rechnung anhand ihrer Positionen einer passenden Kostenstelle zu."
 
     def think(self):
-        return "Ich prüfe die Leistungsbeschreibung und suche nach bekannten Schlüsselbegriffen."
+        match = re.findall(r"7\.\s*Menge.*?\|\s*Ja\s*\|\s*(.*?)\|", self.data.replace("\n", " "))
+        leistung_text = match[0].strip() if match else "nicht gefunden"
 
-    def rule_based_assignment(self, text):
-        text_lower = text.lower()
-        for keyword, kostenstelle in COST_CENTER_RULES.items():
-            if re.search(rf"\b{re.escape(keyword)}\b", text_lower):
-                return kostenstelle
-        return None
+        thought_prompt = PromptTemplate(
+            input_variables=["goal", "leistung"],
+            template="""Du bist ein intelligent handelnder Agent in der Buchhaltung.
+Dein Ziel lautet: {goal}
 
-    def action(self):
-        print("AccountingAgent Think():", self.think())
-        leistung = self._get_leistung()
+Analysiere den folgenden Rechnungsinhalt aus der Spalte „Leistung“:
+"{leistung}"
 
-        kostenstelle = self.rule_based_assignment(leistung)
-        if kostenstelle:
-            print(f"Rule-Based Match gefunden: {kostenstelle}")
-        else:
-            print("Kein Regel-Match. Fallback auf LLM.")
-            kostenstelle = self.llm.invoke(self.prompt()).strip()
-            if not kostenstelle:
-                kostenstelle = DEFAULT_COST_CENTER
+Überlege, wie diese Leistung sinnvoll in eine Kostenstelle eingeordnet werden kann. Antworte mit einem Satz.
+"""
+        )
 
-        self.data["accounting"] = kostenstelle
-        with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, indent=4)
+        thought = self.llm.invoke(thought_prompt.format(
+            goal=self.goal(),
+            leistung=leistung_text
+        ))
 
-        print(f"AccountingAgent Action(): {kostenstelle}")
-        return kostenstelle
+        print(f"AccountingAgent Think(): {thought.strip()}")
+        return thought.strip()
+
+    def action(self, agent_thoughts=None):
+        if not agent_thoughts:
+            agent_thoughts = self.think()
+
+        regel_text = "\n".join([f"{k.capitalize()} → {v}" for k, v in COST_CENTER_RULES.items()])
+
+        prompt = f"""
+Du bist ein Buchhaltungs-Agent. Ziel: Weise die folgende Leistung einer passenden fiktiven Kostenstelle zu.
+
+Aktueller Gedanke: {agent_thoughts}
+
+Verwende folgende Regeln:
+{regel_text}
+Sonstiges → {DEFAULT_COST_CENTER}
+
+Rechnungsauszug (Pflichtangaben-Tabelle):
+{self.data}
+
+Antwortformat: Nur Kostenstelle, z. B.: 1001-Beratung
+"""
+
+        costcenter = self.llm.invoke(prompt).strip()
+        print(f"AccountingAgent Action(): {costcenter}")
+        return costcenter

@@ -1,109 +1,91 @@
 import json
 import re
-from config import RESULTS_PATH, REFERENCE_DATA_PATH
 from langchain_community.llms import Ollama
+from langchain.prompts import PromptTemplate
+from config import RESULTS_PATH, REFERENCE_DATA_PATH, OLLAMA_MODEL
 
 class CheckAgent:
-    def __init__(self, result_path=RESULTS_PATH, known_path=REFERENCE_DATA_PATH):
-        self.result_path = result_path
-        self.known_path = known_path
-        self.llm = Ollama(model="mistral")
+    def __init__(self, validation_result_path=RESULTS_PATH, reference_path=REFERENCE_DATA_PATH):
+        self.llm = Ollama(model=OLLAMA_MODEL)
 
-        with open(self.result_path, "r", encoding="utf-8") as f:
-            self.data = json.load(f)
+        with open(validation_result_path, "r", encoding="utf-8") as f:
+            self.data = json.load(f).get("validation", "")
 
-        try:
-            with open(self.known_path, "r", encoding="utf-8") as f:
-                self.known_data = json.load(f)
-                self.known = self.known_data.get("invoices", [])
-        except FileNotFoundError:
-            self.known = []
+        with open(reference_path, "r", encoding="utf-8") as f:
+            self.known = json.load(f).get("invoices", [])
 
     def goal(self):
-        return "Prüfe die sachliche Korrektheit der Rechnung durch Vergleich mit bekannten Transaktionen."
-
-    def prompt(self, extracted, known_matches):
-        return f"""
-Du bist ein sachlicher Prüfagent. Ziel: Vergleiche die folgende Eingangsrechnung mit bekannten Transaktionen und bewerte die sachliche Plausibilität.
-
-Rechnungsdaten:
-- Rechnungsnummer: {extracted.get("rechnungsnummer")}
-- Lieferant: {extracted.get("lieferant")}
-- Leistung: {extracted.get("leistung")}
-- Betrag: {extracted.get("betrag")} EUR
-
-Bekannte Vergleichseinträge:
-{known_matches}
-
-Antwortmöglichkeiten:
-- sachlich_korrekt
-- nicht_nachvollziehbar
-- unklar
-
-Gib **nur eine dieser Antworten** zurück.
-"""
+        return "Vergleiche die Rechnung mit vorhandenen Referenzen, um die sachliche Richtigkeit mit KI zu bewerten."
 
     def think(self):
-        return "Ich vergleiche extrahierte Rechnungsangaben mit der Referenzdatenbank für sachliche Prüfung."
-
-    def extract_fields(self):
-        validation = self.data.get("validation", "")
-        fields = {}
-
-        patterns = {
-            "rechnungsnummer": r"\| 6\. Fortlaufende Rechnungsnummer \|\s*Ja\s*\|\s*(.*?)\s*\|",
-            "lieferant": r"\| 1\. Name & Anschrift des leistenden Unternehmers \|\s*Ja\s*\|\s*(.*?)\s*\|",
-            "leistung": r"\| 7\. Menge und Art der gelieferten Leistung \|\s*Ja\s*\|\s*(.*?)\s*\|",
-            "betrag": r"Brutto.*?([\d.,]+)"
+        print("CheckAgent Think(): Extrahiere relevante Felder.")
+        return {
+            "rechnungsnummer": self._extract("6. Fortlaufende Rechnungsnummer"),
+            "lieferant": self._extract("1. Name & Anschrift des leistenden Unternehmers"),
+            "leistung": self._extract("7. Menge und Art der gelieferten Leistung"),
+            "betrag": self._extract("9. Entgelt nach Steuersätzen aufgeschlüsselt")
         }
 
-        for key, pattern in patterns.items():
-            match = re.search(pattern, validation.replace("\n", " "))
-            if match:
-                value = match.group(1).strip().replace(",", ".")
-                fields[key] = value
-            else:
-                fields[key] = "unbekannt"
-
-        print("[DEBUG] Extrahierte Felder:", fields)
-        return fields
-
-    def find_similar(self, extracted):
-        matches = []
-        try:
-            betrag_ext = float(extracted.get("betrag", 0))
-        except ValueError:
-            print("[WARNUNG] Betrag nicht interpretierbar:", extracted.get("betrag"))
-            return matches
-
-        for entry in self.known:
-            try:
-                betrag_known = float(entry.get("betrag_brutto", 0))
-                if entry.get("rechnungsnummer") == extracted.get("rechnungsnummer"):
-                    matches.append(entry)
-                elif abs(betrag_known - betrag_ext) < 10:
-                    matches.append(entry)
-            except (ValueError, TypeError):
-                continue
-
-        return matches
-
     def action(self):
-        print("CheckAgent Think():", self.think())
-        extracted = self.extract_fields()
-        similar = self.find_similar(extracted)
+        extracted = self.think()
 
-        if not similar:
-            print("Keine vergleichbaren Transaktionen gefunden.")
-            result = "nicht_nachvollziehbar"
+        # Referenzdaten vorbereiten
+        referenzliste = "\n".join([
+            f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €"
+            for ref in self.known
+        ])
+
+        # Betrag extrahieren
+        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
+        brutto = brutto_match.group(1) if brutto_match else "unbekannt"
+
+        # Rechnungstext zusammensetzen
+        rechnung_text = (
+            f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
+            f"Lieferant: {extracted['lieferant']}\n"
+            f"Leistung: {extracted['leistung']}\n"
+            f"Brutto-Betrag: {brutto} €"
+        )
+
+        # Prompt-Vorlage
+        prompt_template = PromptTemplate(
+            input_variables=["ziel", "rechnung", "referenzen"],
+            template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
+
+Dein Ziel lautet: {ziel}
+
+Gegeben ist die extrahierte Rechnung:
+{rechnung}
+
+Und hier sind bekannte interne Referenzrechnungen:
+{referenzen}
+
+Vergleiche die Inhalte intelligent (auch semantisch) und antworte ausschließlich mit einem dieser Begriffe:
+- sachlich_korrekt
+- nicht_nachvollziehbar
+"""
+        )
+
+        prompt = prompt_template.format(
+            ziel=self.goal(),
+            rechnung=rechnung_text,
+            referenzen=referenzliste
+        )
+
+        # KI-Bewertung einholen
+        result = self.llm.invoke(prompt).strip().lower()
+
+        if result == "sachlich_korrekt":
+            print("CheckAgent Action(): sachlich korrekt")
+            return "sachlich_korrekt"
+        elif result == "nicht_nachvollziehbar":
+            print("CheckAgent Action(): nicht nachvollziehbar")
+            return "nicht_nachvollziehbar"
         else:
-            known_text = json.dumps(similar, indent=2, ensure_ascii=False)
-            decision = self.llm.invoke(self.prompt(extracted, known_text)).strip().lower()
-            result = decision if decision in ["sachlich_korrekt", "nicht_nachvollziehbar", "unklar"] else "unklar"
+            print("CheckAgent Action(): unklar – keine eindeutige KI-Antwort erhalten.")
+            return "unklar"
 
-        self.data["check"] = result
-        with open(self.result_path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, indent=4)
-
-        print(f"CheckAgent Action(): {result}")
-        return result
+    def _extract(self, label):
+        pattern = fr"\|\s*{label}.*?\|\s*(Ja|Nein|Fehlt)\s*\|\s*(.*?)\|"
+        match = re.search(pattern, self.data.replace("\n", " "))
+        return match.group(2).strip() if match else "unbekannt"
