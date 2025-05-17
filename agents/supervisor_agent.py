@@ -14,6 +14,10 @@ class SupervisorAgent:
         self.pdf_path = pdf_path
         self.results = {}
 
+        # PDF-Pfad vorab in results.json speichern
+        with open(RESULTS_PATH, "w", encoding="utf-8") as f:
+            json.dump({"pdf_path": pdf_path}, f, indent=4)
+
     def goal(self):
         return "Koordiniere alle Agenten im Workflow zur automatisierten Rechnungsfreigabe."
 
@@ -35,10 +39,10 @@ class SupervisorAgent:
         validation_result = validation_agent.action()
         self._save_step("validation", validation_result)
 
-        # Prüfe, ob alle Pflichtfelder (1–10) da sind
-        if "| Nein |" in validation_result or "| Fehlt |" in validation_result:
-            missing_fields = validation_result.count("| Nein |") + validation_result.count("| Fehlt |")
-            print(f"Supervisor: {missing_fields} Pflichtangaben fehlen. Validation-Agent wird erneut aufgerufen.")
+        # Prüfe auf fehlende Pflichtfelder 1–10
+        missing = sum(1 for i in range(1, 11) if f"| {i}." in validation_result and "| Nein |" in validation_result)
+        if missing > 0:
+            print(f"Supervisor: {missing} Pflichtangaben fehlen. Validation-Agent wird erneut aufgerufen.")
             second_pass = validation_agent.action()
             combined = validation_result.strip() + "\n" + second_pass.strip()
             self._save_step("validation", combined)
@@ -57,7 +61,7 @@ class SupervisorAgent:
 
         if check_result in ["nicht_nachvollziehbar", "unklar"]:
             self.results["flag_wait_for_user_decision"] = True
-            self._save_step("check", check_result)
+            self._save_step("flag_wait_for_user_decision", True)
             print("SupervisorAgent: Benutzerentscheidung erforderlich. Pausiere.")
             return "Sachliche Entscheidung durch Benutzer erforderlich."
 
@@ -83,7 +87,7 @@ class SupervisorAgent:
 
         # 6. Archive Agent
         print("SupervisorAgent: Starte Archivierungs-Agent.")
-        archive_agent = ArchiveAgent(RESULTS_PATH, self.pdf_path)
+        archive_agent = ArchiveAgent(RESULTS_PATH)
         archive_result = archive_agent.action()
         self._save_step("archive", archive_result)
 

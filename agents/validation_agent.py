@@ -22,6 +22,9 @@ class ValidationAgent:
     def prompt(self):
         return f"""
 Du bist ein Validation-Agent. Deine Aufgabe ist es, aus folgendem Rechnungstext die 12 Pflichtangaben gemäß §14 Abs. 4 UStG zu prüfen und zu extrahieren.
+Bitte achte genau auf die Position im Dokument: 
+- Der **Leistungserbringer** steht üblicherweise **oben auf der Rechnung**.
+- Der **Leistungsempfänger (Kunde)** steht meist weiter unten oder ist mit "Kunde", "Kundennummer" etc. markiert.
 
 **Gib die Antwort ausschließlich in folgender Markdown-Tabelle zurück:**
 | Pflichtangabe | Vorhanden | Extrahierter Wert |

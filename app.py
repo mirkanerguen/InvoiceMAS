@@ -38,7 +38,7 @@ if results.get("flag_wait_for_user_decision"):
     if col1.button("Ja – trotzdem fortsetzen"):
         supervisor = SupervisorAgent("")  # pdf_path leer, da nicht mehr benötigt
         with st.spinner("Genehmigung, Buchung & Archivierung werden fortgesetzt..."):
-            supervisor.continue_after_user_approval()
+            supervisor.action()
         st.success("Fortsetzung abgeschlossen.")
         st.rerun()
     if col2.button("Nein – Workflow abbrechen"):
