@@ -1,5 +1,9 @@
 # config.py
 
+OWN_COMPANY_NAME = "Karbo-Power UG"
+OWN_COMPANY_ADDRESS = "Gutenbergstraße 32, 35043 Marburg"
+OWN_COMPANY_FULL = f"{OWN_COMPANY_NAME}, {OWN_COMPANY_ADDRESS}"
+
 # Archivpfade
 ARCHIVE_DIR = "archive"
 

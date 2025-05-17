@@ -3,7 +3,7 @@ import pandas as pd
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 from utils.pdf_parser import extract_text_from_pdf
-from config import OLLAMA_MODEL
+from config import OLLAMA_MODEL, OWN_COMPANY_FULL
 
 class ValidationAgent:
     def __init__(self, pdf_path):
@@ -14,29 +14,26 @@ class ValidationAgent:
     def goal(self):
         return "Alle Pflichtangaben gemäß §14 UStG müssen vorhanden und korrekt extrahiert sein."
 
+    
+
     def prompt(self):
         return PromptTemplate(
             input_variables=["invoice_text", "agent_thoughts"],
-            template="""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
+            template=f"""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
 
-    Deine aktuellen Gedanken sind: {agent_thoughts}
+    Deine aktuellen Gedanken sind: {{agent_thoughts}}
 
     Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
     Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
 
-    Achte besonders auf die **korrekte Unterscheidung** zwischen dem **leistenden Unternehmer** (der die Leistung erbringt und die Rechnung stellt) und dem **Leistungsempfänger** (der die Leistung erhält und bezahlt). Nutze folgende Hinweise zur sicheren Zuordnung:
+    Besonderheit: Wenn der Name und die Anschrift der eigenen Firma in der Rechnung vorkommen, handelt es sich dabei um den Leistungsempfänger.
+    Die eigene Firma lautet:
 
-    - Der **leistende Unternehmer** ist in der Regel:
-    - Die Firma mit **Steuernummer, USt-ID und Bankverbindung**
-    - In der **Fußzeile oder im Signaturbereich** erwähnt
-    - Im Kontext von **"unsere Leistungen", "wir berechnen"** o. Ä.
+    {OWN_COMPANY_FULL}
 
-    - Der **Leistungsempfänger** (Kunde):
-    - Steht meist als **Adressblock oben oder rechts**
-    - Wird selten nochmal im Fließtext erwähnt
-    - Hat **keine** Steuernummer/USt-ID im Dokument
+    Solltest du diese Angaben im Rechnungstext finden, trage sie in der Tabelle unter „Name & Anschrift des Leistungsempfängers“ ein.
 
-    Auch wenn der Leistungsempfänger **nicht explizit als „Kunde“ bezeichnet** ist, darfst du ihn **aus dem Adressblock oder Kontext korrekt zuordnen.**
+    Achte zudem auf die **korrekte Unterscheidung** zwischen leistendem Unternehmer (stellt Rechnung) und Leistungsempfänger (empfängt die Leistung, unsere Firma).
 
     Gib ausschließlich die Namen und Anschriften exakt in folgender Tabelle im Markdown-Format aus.
     Jede Tabellenzeile mit **Zeilenumbruch**, KEINE Zeilenumbrüche innerhalb einer Zelle!
@@ -57,7 +54,7 @@ class ValidationAgent:
     | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
 
     Rechnungstext:
-    {invoice_text}
+    {{invoice_text}}
     """
         )
 
