@@ -28,6 +28,26 @@ class BookingAgent:
         conn.close()
         return count > 0
 
+    def extract_amount_with_llm(self, validation_text: str) -> str:
+        prompt = f"""
+    Du bist ein Buchhaltungsassistent. Extrahiere aus dem folgenden Text den **Bruttobetrag der Rechnung** in Euro.
+    Text:
+    {validation_text}
+
+    Gib nur den Betrag in dieser Form zurück, z. B.: 1200.00
+    """
+        response = self.llm.invoke(prompt).strip()
+
+        match = re.search(r"([\d]+[\.,]?[\d]*)", response)
+        if match:
+            betrag = match.group(1).replace(",", ".")
+            try:
+                float(betrag)
+                return betrag
+            except ValueError:
+                pass
+        return "0.00"
+
     def action(self):
         gedanke = self.think()
         validation = self.data.get("validation", "")
@@ -36,7 +56,7 @@ class BookingAgent:
         match_nr = re.search(r"\|6\. Fortlaufende Rechnungsnummer\s*\|\s*Ja\s*\|\s*(.*?)\s*\|", validation)
         rechnungsnummer = match_nr.group(1).strip() if match_nr else "UNBEKANNT"
 
-        # Prüfen, ob bereits gebucht (über Datenbank)
+        # Prüfen, ob bereits gebucht
         if self.is_invoice_already_booked(rechnungsnummer):
             result = f"Buchung abgebrochen - Rechnung {rechnungsnummer} wurde bereits gebucht."
             self.data["booking"] = result
@@ -44,10 +64,9 @@ class BookingAgent:
             self._save()
             return result
 
-        # Kostenstelle und Betrag extrahieren
+        # Kostenstelle und Bruttobetrag extrahieren
         kostenstelle = self.data.get("accounting", "Unbekannt")
-        match_betrag = re.search(r"Brutto[: ]*([\d\.,]+)", validation.replace("\n", " "))
-        betrag = match_betrag.group(1).replace(".", "").replace(",", ".") if match_betrag else "0.00"
+        betrag = self.extract_amount_with_llm(validation)
 
         # Prompt zur simulierten Buchung
         buchung_prompt = f"""

@@ -19,34 +19,48 @@ class ValidationAgent:
             input_variables=["invoice_text", "agent_thoughts"],
             template="""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
 
-Deine aktuellen Gedanken sind: {agent_thoughts}
+    Deine aktuellen Gedanken sind: {agent_thoughts}
 
-Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
-Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
+    Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
+    Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
 
-Achte ganz genau darauf, wer der leistende Unternehmer und wer der Leistungsempfänger ist, und ordne die Namen und Anschriften exakt korrekt zu!
+    Achte besonders auf die **korrekte Unterscheidung** zwischen dem **leistenden Unternehmer** (der die Leistung erbringt und die Rechnung stellt) und dem **Leistungsempfänger** (der die Leistung erhält und bezahlt). Nutze folgende Hinweise zur sicheren Zuordnung:
 
-Generiere exakt diese Tabelle im Markdown-Format (Jede Tabellenzeile unbedingt mit Zeilenumbruch, KEINE Zeilenumbrüche innerhalb einer Zeile!):
+    - Der **leistende Unternehmer** ist in der Regel:
+    - Die Firma mit **Steuernummer, USt-ID und Bankverbindung**
+    - In der **Fußzeile oder im Signaturbereich** erwähnt
+    - Im Kontext von **"unsere Leistungen", "wir berechnen"** o. Ä.
 
-| Pflichtangabe | Vorhanden | Extrahierter Wert |
-|---------------|-----------|-------------------|
-| 1. Name & Anschrift des leistenden Unternehmers | Ja/Nein | Nur Name und Anschrift |
-| 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | Nur Name und Anschrift |
-| 3. Steuernummer des Unternehmers | Ja/Nein | Nur die Steuernummer |
-| 4. Umsatzsteuer-ID des Unternehmers | Ja/Nein | Nur die Umsatzsteuer-ID |
-| 5. Ausstellungsdatum | Ja/Nein | Datum |
-| 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
-| 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
-| 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
-| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Netto-, Bruttobetrag, Steuerbetrag |
-| 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
-| 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
-| 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
+    - Der **Leistungsempfänger** (Kunde):
+    - Steht meist als **Adressblock oben oder rechts**
+    - Wird selten nochmal im Fließtext erwähnt
+    - Hat **keine** Steuernummer/USt-ID im Dokument
 
-Rechnungstext:
-{invoice_text}
-"""
+    Auch wenn der Leistungsempfänger **nicht explizit als „Kunde“ bezeichnet** ist, darfst du ihn **aus dem Adressblock oder Kontext korrekt zuordnen.**
+
+    Gib ausschließlich die Namen und Anschriften exakt in folgender Tabelle im Markdown-Format aus.
+    Jede Tabellenzeile mit **Zeilenumbruch**, KEINE Zeilenumbrüche innerhalb einer Zelle!
+
+    | Pflichtangabe | Vorhanden | Extrahierter Wert |
+    |---------------|-----------|-------------------|
+    | 1. Name & Anschrift des leistenden Unternehmers | Ja/Nein | Nur Name und Anschrift |
+    | 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | Nur Name und Anschrift |
+    | 3. Steuernummer des Unternehmers | Ja/Nein | Nur die Steuernummer |
+    | 4. Umsatzsteuer-ID des Unternehmers | Ja/Nein | Nur die Umsatzsteuer-ID |
+    | 5. Ausstellungsdatum | Ja/Nein | Datum |
+    | 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
+    | 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
+    | 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
+    | 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Netto-, Bruttobetrag, Steuerbetrag |
+    | 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
+    | 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
+    | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
+
+    Rechnungstext:
+    {invoice_text}
+    """
         )
+
 
     def think(self):
         thought_prompt = PromptTemplate(
