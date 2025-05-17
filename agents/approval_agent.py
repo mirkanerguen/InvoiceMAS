@@ -85,7 +85,7 @@ Antwort (nur Zahl):
 
         print("ApprovalAgent: Entscheidung gespeichert.")
         return result
-
+    
     def run(self):
         decision = self.think()
         return self.action(decision)
