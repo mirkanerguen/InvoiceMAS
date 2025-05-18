@@ -39,7 +39,7 @@ class SupervisorAgent:
         # 1. Validation
         print("SupervisorAgent: Starte Validation-Agent.")
         validation_result = self.validation_agent.run()
-        self.save_intermediate_result("validation", validation_result)
+        self.save_results("validation", validation_result)
 
         thought = self.think(validation_result, "Validation")
         if "nein" in thought:
@@ -47,7 +47,7 @@ class SupervisorAgent:
             # 1. Versuch automatische Korrektur
             improved_prompt = self.sv_prompt(validation_result, thought)
             validation_result = self.validation_agent.run(improved_prompt)
-            self.save_intermediate_result("validation", validation_result)
+            self.save_results("validation", validation_result)
 
             thought = self.think(validation_result, "Validation")
             if "nein" in thought:
@@ -55,32 +55,32 @@ class SupervisorAgent:
                 print("Wiederholt Fehler erkannt, Benutzerinteraktion nötig.")
                 missing_info = self.ask_user(thought)
                 validation_result = self.validation_agent.run_with_user_input(missing_info)
-                self.save_intermediate_result("validation", validation_result)
+                self.save_results("validation", validation_result)
 
         # 2. Accounting
         print("SupervisorAgent: Starte Accounting-Agent.")
         accounting_agent = AccountingAgent(RESULTS_PATH)
         cost_center = accounting_agent.action()
-        self.save_intermediate_result("accounting", cost_center)
+        self.save_results("accounting", cost_center)
 
         # 3. Sachliche Prüfung
         print("SupervisorAgent: Starte Check-Agent (sachliche Prüfung).")
         check_agent = CheckAgent(RESULTS_PATH)
         check_result = check_agent.action()
-        self.save_intermediate_result("check", check_result)
+        self.save_results("check", check_result)
 
         # 4. Freigabe
         print("SupervisorAgent: Starte Approval-Agent.")
         approval_agent = ApprovalAgent(RESULTS_PATH)
         decision_text = approval_agent.think()
         approval_result = approval_agent.action(decision_text)
-        self.save_intermediate_result("approval", approval_result)
+        self.save_results("approval", approval_result)
 
         # 5. Buchung
         print("SupervisorAgent: Starte Booking-Agent.")
         booking_agent = BookingAgent(RESULTS_PATH)
         booking_result = booking_agent.action()
-        self.save_intermediate_result("booking", booking_result)
+        self.save_results("booking", booking_result)
 
         booking_status = self.get_booking_status()
         if booking_status == "abgebrochen":
@@ -91,7 +91,7 @@ class SupervisorAgent:
         print("SupervisorAgent: Starte Archivierungs-Agent.")
         archive_agent = ArchiveAgent(RESULTS_PATH, self.pdf_path)
         archive_result = archive_agent.action()
-        self.save_intermediate_result("archive", archive_result)
+        self.save_results("archive", archive_result)
 
         return archive_result
 
@@ -108,7 +108,7 @@ class SupervisorAgent:
         user_input = input(f"Supervisor fragt: '{missing_info}'. Bitte geben Sie die fehlende Information ein: ")
         return user_input
 
-    def save_intermediate_result(self, step, result):
+    def save_results(self, step, result):
         self.results[step] = result
         with open(RESULTS_PATH, "w", encoding="utf-8") as file:
             json.dump(self.results, file, indent=4)
