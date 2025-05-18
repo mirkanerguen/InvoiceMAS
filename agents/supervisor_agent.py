@@ -82,6 +82,12 @@ class SupervisorAgent:
         approval_result = approval_agent.action(decision_text)
         self.save_results("approval", approval_result)
 
+        # Prüfe, ob Genehmigung verweigert wurde
+        if "verweigert" in approval_result.lower():
+            print("SupervisorAgent: Genehmigung wurde verweigert - Workflow wird abgebrochen.")
+            return approval_result
+
+
         # 5. Buchung
         print("SupervisorAgent: Starte Booking-Agent.")
         booking_agent = BookingAgent(RESULTS_PATH)

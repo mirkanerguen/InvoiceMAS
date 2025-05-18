@@ -3,6 +3,8 @@ import re
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 from config import RESULTS_PATH, REFERENCE_DATA_PATH, OLLAMA_MODEL
+from utils.invoice_comparator import compare_invoice_with_reference
+
 
 class CheckAgent:
     def __init__(self, validation_result_path=RESULTS_PATH, reference_path=REFERENCE_DATA_PATH):
@@ -15,7 +17,7 @@ class CheckAgent:
             self.known = json.load(f).get("invoices", [])
 
     def goal(self):
-        return "Vergleiche die Rechnung mit vorhandenen Referenzen, um die sachliche Richtigkeit mit KI zu bewerten."
+        return "Prüfe die sachliche Richtigkeit einer Rechnung auf Basis interner Referenzdaten."
 
     def think(self):
         print("CheckAgent Think(): Extrahiere relevante Felder.")
@@ -29,47 +31,57 @@ class CheckAgent:
     def action(self):
         extracted = self.think()
 
-        # Referenzdaten vorbereiten
+        # Bruttobetrag aus extrahierten Werten ziehen
+        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
+        brutto_betrag = brutto_match.group(1).replace(",", ".") if brutto_match else "0.00"
+
+        match_found = compare_invoice_with_reference(
+            rechnungsnummer=extracted["rechnungsnummer"],
+            lieferant=extracted["lieferant"],
+            leistung=extracted["leistung"],
+            betrag=brutto_betrag,
+            reference_data=self.known
+        )
+
+
+        if match_found:
+            print("CheckAgent Action(): sachlich korrekt (regelbasiert bestätigt)")
+            return "sachlich_korrekt"
+
+        # Wenn kein exakter Match: LLM zur finalen Bewertung
         referenzliste = "\n".join([
-            f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €"
+            f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, "
+            f"Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €"
             for ref in self.known
         ])
 
-        # Betrag extrahieren
-        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
-        brutto = brutto_match.group(1) if brutto_match else "unbekannt"
-
-        # Rechnungstext zusammensetzen
         rechnung_text = (
             f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
             f"Lieferant: {extracted['lieferant']}\n"
             f"Leistung: {extracted['leistung']}\n"
-            f"Brutto-Betrag: {brutto} €"
+            f"Brutto-Betrag: {brutto_betrag} EUR"
         )
 
         prompt_template = PromptTemplate(
-        input_variables=["ziel", "rechnung", "referenzen"],
-        template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
+            input_variables=["ziel", "rechnung", "referenzen"],
+            template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
 
-    Dein Ziel lautet: {ziel}
+Dein Ziel lautet: {ziel}
 
-    Gegeben ist die extrahierte Rechnung:
-    {rechnung}
+### Extrahierte Rechnung:
+{rechnung}
 
-    Und hier sind bekannte interne Referenzrechnungen:
-    {referenzen}
+### Interne Referenzrechnungen:
+{referenzen}
 
-    Führe folgenden Abgleich durch:
+Vergleiche Rechnung und Referenzen (semantisch und sachlich). 
+Wenn keine ausreichende Übereinstimmung vorhanden ist, gilt die Rechnung als nicht nachvollziehbar.
 
-    1. **Rechnungsnummer**: Die Nummer muss **exakt** mit einer bekannten übereinstimmen. Wenn nicht, gilt die Prüfung als **nicht nachvollziehbar**.
-    2. **Lieferant, Leistung und Bruttobetrag**: Diese sollen zusätzlich plausibel übereinstimmen (auch sinngemäß).
-
-    Antworte am Ende ausschließlich mit einem dieser Begriffe:
-    - sachlich_korrekt (wenn alle Kriterien erfüllt sind, inklusive Rechnungsnummer)
-    - nicht_nachvollziehbar (wenn die Rechnungsnummer abweicht oder die Daten nicht plausibel sind)
-    """
-    )
-
+Antwort nur mit einem Wort:
+- sachlich_korrekt
+- nicht_nachvollziehbar
+"""
+        )
 
         prompt = prompt_template.format(
             ziel=self.goal(),
@@ -77,17 +89,16 @@ class CheckAgent:
             referenzen=referenzliste
         )
 
-        # KI-Bewertung einholen
         result = self.llm.invoke(prompt).strip().lower()
 
         if result == "sachlich_korrekt":
-            print("CheckAgent Action(): sachlich korrekt")
+            print("CheckAgent Action(): sachlich korrekt (LLM-Einschätzung)")
             return "sachlich_korrekt"
         elif result == "nicht_nachvollziehbar":
-            print("CheckAgent Action(): nicht nachvollziehbar")
+            print("CheckAgent Action(): nicht nachvollziehbar (LLM-Einschätzung)")
             return "nicht_nachvollziehbar"
         else:
-            print("CheckAgent Action(): unklar – keine eindeutige KI-Antwort erhalten.")
+            print("CheckAgent Action(): unklar – LLM-Antwort nicht eindeutig.")
             return "unklar"
 
     def _extract(self, label):
