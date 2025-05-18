@@ -2,6 +2,7 @@ import os
 import shutil
 import json
 import sqlite3
+import re
 from datetime import datetime
 from config import ARCHIVE_DIR, ARCHIVE_DB_PATH
 
@@ -31,6 +32,7 @@ class ArchiveAgent:
         # Rechnungsnummer extrahieren
         validation_table = data.get("validation", "")
         rechnungsnummer = self._extract_field(validation_table, "6. Fortlaufende Rechnungsnummer") or "unknown"
+        rechnungsnummer = re.sub(r"(Rechnungsnummer\s*[:\-]?\s*)", "", rechnungsnummer, flags=re.IGNORECASE)
         rechnungsnummer = rechnungsnummer.replace(":", "").replace("/", "").replace("\\", "").strip()
 
         # Prüfen auf bereits archiviert
@@ -53,7 +55,6 @@ class ArchiveAgent:
         return f"Archiviert unter: {folder_path}"
 
     def _extract_field(self, markdown_table, label):
-        import re
         pattern = fr"\|\s*{label}.*?\|\s*(Ja|Nein|Fehlt)\s*\|\s*(.*?)\|"
         match = re.search(pattern, markdown_table.replace("\n", " "))
         return match.group(2).strip() if match else None

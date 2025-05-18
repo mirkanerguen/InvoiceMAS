@@ -69,6 +69,12 @@ class SupervisorAgent:
         check_result = check_agent.action()
         self.save_results("check", check_result)
 
+        if check_result == "nicht_nachvollziehbar":
+            user_decision = input("Die Rechnung konnte sachlich nicht geprüft werden. Trotzdem fortfahren? (ja/nein): ").strip().lower()
+            if user_decision != "ja":
+                print("SupervisorAgent: Workflow abgebrochen durch den Benutzer.")
+                return "Abbruch nach negativer sachlicher Prüfung."
+
         # 4. Freigabe
         print("SupervisorAgent: Starte Approval-Agent.")
         approval_agent = ApprovalAgent(RESULTS_PATH)

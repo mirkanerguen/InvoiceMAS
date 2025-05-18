@@ -47,24 +47,29 @@ class CheckAgent:
             f"Brutto-Betrag: {brutto} €"
         )
 
-        # Prompt-Vorlage
         prompt_template = PromptTemplate(
-            input_variables=["ziel", "rechnung", "referenzen"],
-            template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
+        input_variables=["ziel", "rechnung", "referenzen"],
+        template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
 
-Dein Ziel lautet: {ziel}
+    Dein Ziel lautet: {ziel}
 
-Gegeben ist die extrahierte Rechnung:
-{rechnung}
+    Gegeben ist die extrahierte Rechnung:
+    {rechnung}
 
-Und hier sind bekannte interne Referenzrechnungen:
-{referenzen}
+    Und hier sind bekannte interne Referenzrechnungen:
+    {referenzen}
 
-Vergleiche die Inhalte intelligent (auch semantisch) und antworte ausschließlich mit einem dieser Begriffe:
-- sachlich_korrekt
-- nicht_nachvollziehbar
-"""
-        )
+    Führe folgenden Abgleich durch:
+
+    1. **Rechnungsnummer**: Die Nummer muss **exakt** mit einer bekannten übereinstimmen. Wenn nicht, gilt die Prüfung als **nicht nachvollziehbar**.
+    2. **Lieferant, Leistung und Bruttobetrag**: Diese sollen zusätzlich plausibel übereinstimmen (auch sinngemäß).
+
+    Antworte am Ende ausschließlich mit einem dieser Begriffe:
+    - sachlich_korrekt (wenn alle Kriterien erfüllt sind, inklusive Rechnungsnummer)
+    - nicht_nachvollziehbar (wenn die Rechnungsnummer abweicht oder die Daten nicht plausibel sind)
+    """
+    )
+
 
         prompt = prompt_template.format(
             ziel=self.goal(),
