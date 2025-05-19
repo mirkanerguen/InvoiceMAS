@@ -5,6 +5,7 @@ from langchain.prompts import PromptTemplate
 from utils.pdf_parser import extract_text_from_pdf
 from config import OLLAMA_MODEL, OWN_COMPANY_FULL
 
+
 class ValidationAgent:
     def __init__(self, pdf_path):
         self.pdf_path = pdf_path
@@ -14,54 +15,52 @@ class ValidationAgent:
     def goal(self):
         return "Alle Pflichtangaben gemäß §14 UStG müssen vorhanden und korrekt extrahiert sein."
 
-    
-
     def prompt(self):
         return PromptTemplate(
             input_variables=["invoice_text", "agent_thoughts"],
             template=f"""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
 
-        Deine aktuellen Gedanken sind: {{agent_thoughts}}
+Deine aktuellen Gedanken sind: {{agent_thoughts}}
 
-        Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
-        Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
+Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
+Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
 
-        Besonderheit: Wenn der Name und die Anschrift der eigenen Firma in der Rechnung vorkommen, handelt es sich dabei um den Leistungsempfänger.
-        Die eigene Firma lautet:
+Besonderheit: Wenn der Name und die Anschrift der eigenen Firma in der Rechnung vorkommen, handelt es sich dabei um den Leistungsempfänger.
+Die eigene Firma lautet:
 
-        {OWN_COMPANY_FULL}
+{OWN_COMPANY_FULL}
 
-        Solltest du diese Angaben im Rechnungstext finden, trage sie in der Tabelle unter „Name & Anschrift des Leistungsempfängers“ ein.
+Solltest du diese Angaben im Rechnungstext finden, trage sie in der Tabelle unter „Name & Anschrift des Leistungsempfängers“ ein.
 
-        **Hinweis zur Steuernummer und USt-ID:**  
-        Laut §14 Abs. 4 Nr. 2 UStG muss **entweder die Steuernummer oder die USt-IdNr.** angegeben sein. Wenn **eine der beiden Angaben vorhanden ist**, gilt die Pflichtangabe als erfüllt.
+**Hinweis zur Steuernummer und USt-ID:**  
+Laut §14 Abs. 4 Nr. 2 UStG muss **entweder die Steuernummer oder die USt-IdNr.** angegeben sein. Wenn **eine der beiden Angaben vorhanden ist**, gilt die Pflichtangabe als erfüllt.
 
-        Achte zudem auf die **korrekte Unterscheidung** zwischen leistendem Unternehmer (stellt Rechnung) und Leistungsempfänger (empfängt die Leistung, unsere Firma).
+Achte zudem auf die **korrekte Unterscheidung** zwischen leistendem Unternehmer (stellt Rechnung) und Leistungsempfänger (empfängt die Leistung, unsere Firma).
 
-        Gib ausschließlich die Namen und Anschriften exakt in folgender Tabelle im Markdown-Format aus.
-        Jede Tabellenzeile mit **Zeilenumbruch**, KEINE Zeilenumbrüche innerhalb einer Zelle!
+Achte darauf:
+- Gib ausschließlich die untenstehende Tabelle im **Markdown-Format** zurück.
+- Jede Tabellenzeile **muss in genau einer Zeile stehen**.
+- Kein Zeilenumbruch innerhalb einer Zelle!
 
-        | Pflichtangabe | Vorhanden | Extrahierter Wert |
-        |---------------|-----------|-------------------|
-        | 1. Name & Anschrift des leistenden Unternehmers | Ja/Nein | Nur Name und Anschrift |
-        | 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | Nur Name und Anschrift |
-        | 3. Steuernummer des Unternehmers | Ja/Nein | Nur die Steuernummer |
-        | 4. Umsatzsteuer-ID des Unternehmers | Ja/Nein | Nur die Umsatzsteuer-ID |
-        | 5. Ausstellungsdatum | Ja/Nein | Datum |
-        | 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
-        | 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
-        | 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
-        | 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Netto-, Bruttobetrag, Steuerbetrag |
-        | 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
-        | 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
-        | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
+| Pflichtangabe | Vorhanden | Extrahierter Wert |
+|---------------|-----------|-------------------|
+| 1. Name & Anschrift des leistenden Unternehmers | Ja/Nein | Nur Name und Anschrift |
+| 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | Nur Name und Anschrift |
+| 3. Steuernummer des Unternehmers | Ja/Nein | Nur die Steuernummer |
+| 4. Umsatzsteuer-ID des Unternehmers | Ja/Nein | Nur die Umsatzsteuer-ID |
+| 5. Ausstellungsdatum | Ja/Nein | Datum |
+| 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
+| 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
+| 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
+| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Netto-, Bruttobetrag, Steuerbetrag |
+| 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
+| 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
+| 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
 
-        Rechnungstext:
-        {{invoice_text}}
-        """
-
+Rechnungstext:
+{{invoice_text}}
+"""
         )
-
 
     def think(self):
         thought_prompt = PromptTemplate(
@@ -97,7 +96,10 @@ Antworte kurz und präzise mit einem Satz."""
 
         result = self.llm.invoke(formatted_prompt)
 
-        # Robuste Umwandlung des LLM-Outputs in Tabellenformat
+        # Debug-Ausgabe
+        print("ValidationAgent Raw Output:\n", result)
+
+        # Robustere Umwandlung des LLM-Outputs in Tabellenformat
         result = result.replace("\n", " ")
         result = re.sub(r"\|\s*(\d+\.)", r"\n|\1", result)
 
@@ -122,16 +124,19 @@ Antworte kurz und präzise mit einem Satz."""
 
     def to_dataframe(self, markdown_table):
         pattern = r"\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|"
-        matches = re.findall(pattern, markdown_table)
+        matches = re.findall(pattern, markdown_table.replace("\n", ""))
 
-        if not matches or len(matches) < 2:
-            raise ValueError(f"Ungültige Tabelle erhalten:\n{markdown_table}")
+        if not matches or len(matches) < 3:
+            raise ValueError(f"Fehlerhafte Tabelle erkannt:\n{markdown_table}")
 
         header = [col.strip() for col in matches[0]]
         data_rows = [
             [col.strip() for col in row]
             for row in matches[1:]
-            if "---" not in row[0] and row[0] != ""
+            if all(col.strip() for col in row) and len(row) == 3
         ]
+
+        if any(len(row) != 3 for row in data_rows):
+            raise ValueError("Nicht alle Zeilen haben exakt 3 Spalten.")
 
         return pd.DataFrame(data_rows, columns=header)
