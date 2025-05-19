@@ -3,21 +3,17 @@ import re
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 from config import RESULTS_PATH, REFERENCE_DATA_PATH, OLLAMA_MODEL
-from utils.invoice_comparator import compare_invoice_with_reference
-
 
 class CheckAgent:
     def __init__(self, validation_result_path=RESULTS_PATH, reference_path=REFERENCE_DATA_PATH):
         self.llm = Ollama(model=OLLAMA_MODEL)
-
         with open(validation_result_path, "r", encoding="utf-8") as f:
             self.data = json.load(f).get("validation", "")
-
         with open(reference_path, "r", encoding="utf-8") as f:
             self.known = json.load(f).get("invoices", [])
 
     def goal(self):
-        return "Prüfe die sachliche Richtigkeit einer Rechnung auf Basis interner Referenzdaten."
+        return "Prüfe die sachliche Richtigkeit einer Rechnung mit Fokus auf exakte Rechnungsnummer und semantisch plausible Übereinstimmung weiterer Felder."
 
     def think(self):
         print("CheckAgent Think(): Extrahiere relevante Felder.")
@@ -30,63 +26,48 @@ class CheckAgent:
 
     def action(self):
         extracted = self.think()
-
-        # Bruttobetrag aus extrahierten Werten ziehen
-        brutto_match = re.search(r"Brutto[: ]*([\d\.,]+)", extracted["betrag"])
-        brutto_betrag = brutto_match.group(1).replace(",", ".") if brutto_match else "0.00"
-
-        match_found = compare_invoice_with_reference(
-            rechnungsnummer=extracted["rechnungsnummer"],
-            lieferant=extracted["lieferant"],
-            leistung=extracted["leistung"],
-            betrag=brutto_betrag,
-            reference_data=self.known
+        brutto = self._extract_bruttobetrag(extracted["betrag"])
+        referenz = next(
+            (r for r in self.known if r["rechnungsnummer"].strip() == extracted["rechnungsnummer"].strip()),
+            None
         )
 
+        if not referenz:
+            print("CheckAgent Action(): Rechnungsnummer nicht bekannt → nicht nachvollziehbar.")
+            return "nicht_nachvollziehbar"
 
-        if match_found:
-            print("CheckAgent Action(): sachlich korrekt (regelbasiert bestätigt)")
-            return "sachlich_korrekt"
-
-        # Wenn kein exakter Match: LLM zur finalen Bewertung
-        referenzliste = "\n".join([
-            f"- Rechnungsnr: {ref['rechnungsnummer']}, Lieferant: {ref['lieferant']}, "
-            f"Leistung: {ref['leistung']}, Brutto: {ref['betrag_brutto']} €"
-            for ref in self.known
-        ])
-
+        referenzliste = (
+            f"- Rechnungsnr: {referenz['rechnungsnummer']}, Lieferant: {referenz['lieferant']}, "
+            f"Leistung: {referenz['leistung']}, Brutto: {referenz['betrag_brutto']} €"
+        )
         rechnung_text = (
             f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
             f"Lieferant: {extracted['lieferant']}\n"
             f"Leistung: {extracted['leistung']}\n"
-            f"Brutto-Betrag: {brutto_betrag} EUR"
+            f"Brutto-Betrag: {brutto} EUR"
         )
 
         prompt_template = PromptTemplate(
-            input_variables=["ziel", "rechnung", "referenzen"],
-            template="""Du bist ein KI-Agent zur sachlichen Prüfung von Rechnungen.
+            input_variables=["ziel", "rechnung", "referenz"],
+            template="""Du bist ein KI-Agent zur sachlichen Prüfung einer Rechnung.
 
 Dein Ziel lautet: {ziel}
 
-### Extrahierte Rechnung:
+Hier ist die zu prüfende Rechnung:
 {rechnung}
 
-### Interne Referenzrechnungen:
-{referenzen}
+Hier ist die bekannte Referenzrechnung:
+{referenz}
 
-Vergleiche Rechnung und Referenzen (semantisch und sachlich). 
-Wenn keine ausreichende Übereinstimmung vorhanden ist, gilt die Rechnung als nicht nachvollziehbar.
-
-Antwort nur mit einem Wort:
-- sachlich_korrekt
-- nicht_nachvollziehbar
+Vergleiche die Inhalte. Achte auf sinngemäße Übereinstimmung bei Lieferant, Leistung und Bruttobetrag.
+Wenn alles plausibel übereinstimmt, antworte mit "sachlich_korrekt", sonst mit "nicht_nachvollziehbar".
 """
         )
 
         prompt = prompt_template.format(
             ziel=self.goal(),
             rechnung=rechnung_text,
-            referenzen=referenzliste
+            referenz=referenzliste
         )
 
         result = self.llm.invoke(prompt).strip().lower()
@@ -105,3 +86,7 @@ Antwort nur mit einem Wort:
         pattern = fr"\|\s*{label}.*?\|\s*(Ja|Nein|Fehlt)\s*\|\s*(.*?)\|"
         match = re.search(pattern, self.data.replace("\n", " "))
         return match.group(2).strip() if match else "unbekannt"
+
+    def _extract_bruttobetrag(self, betrag_text):
+        match = re.search(r"Brutto[: ]*([\d\.,]+)", betrag_text)
+        return match.group(1).replace(",", ".") if match else "0.00"
