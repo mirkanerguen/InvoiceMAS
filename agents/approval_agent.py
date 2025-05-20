@@ -32,7 +32,7 @@ Dein Ziel lautet:
 Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0-3)** zurück, die deine Entscheidung darstellt:
 
 1 = Genehmigung durch Mitarbeiter (bis 500 €)  
-2 = Genehmigung durch Teamleiter (501-5000 €)  
+2 = Genehmigung durch Teamleiter (501 bis 5000 €)  
 3 = Genehmigung durch Abteilungsleiter (ab 5001 €)  
 0 = Genehmigung verweigern
 
