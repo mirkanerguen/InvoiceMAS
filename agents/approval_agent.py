@@ -32,8 +32,8 @@ Dein Ziel lautet:
 Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0-3)** zurück, die deine Entscheidung darstellt:
 
 1 = Genehmigung durch Mitarbeiter (bis 500 €)  
-2 = Genehmigung durch Teamleiter (501-5.000 €)  
-3 = Genehmigung durch Abteilungsleiter (ab 5.001 €)  
+2 = Genehmigung durch Teamleiter (501-5000 €)  
+3 = Genehmigung durch Abteilungsleiter (ab 5001 €)  
 0 = Genehmigung verweigern
 
 Rechnungsauszug:
@@ -56,7 +56,9 @@ Antwort (nur Zahl):
 
         elif decision_code == "2":
             print(f"Login {TEAMLEITER_ROLE}:")
-            if check_credentials(input("Benutzername: "), input("Passwort: ")):
+            username = input("Benutzername: ")
+            password = input("Passwort: ")
+            if check_credentials(username, password, role=TEAMLEITER_ROLE):
                 result = f"Genehmigt - Rolle: {TEAMLEITER_ROLE}"
                 status = "genehmigt"
             else:
@@ -65,7 +67,9 @@ Antwort (nur Zahl):
 
         elif decision_code == "3":
             print(f"Login {ABTEILUNGSLEITER_ROLE}:")
-            if check_credentials(input("Benutzername: "), input("Passwort: ")):
+            username = input("Benutzername: ")
+            password = input("Passwort: ")
+            if check_credentials(username, password, role=ABTEILUNGSLEITER_ROLE):
                 result = f"Genehmigt - Rolle: {ABTEILUNGSLEITER_ROLE}"
                 status = "genehmigt"
             else:
@@ -85,7 +89,7 @@ Antwort (nur Zahl):
 
         print("ApprovalAgent: Entscheidung gespeichert.")
         return result
-    
+
     def run(self):
         decision = self.think()
         return self.action(decision)
