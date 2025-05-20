@@ -79,7 +79,7 @@ Wenn alles plausibel übereinstimmt, antworte mit "sachlich_korrekt", sonst mit 
             print("CheckAgent Action(): nicht nachvollziehbar (LLM-Einschätzung)")
             return "nicht_nachvollziehbar"
         else:
-            print("CheckAgent Action(): unklar – LLM-Antwort nicht eindeutig.")
+            print("CheckAgent Action(): unklar - LLM-Antwort nicht eindeutig.")
             return "unklar"
 
     def _extract(self, label):

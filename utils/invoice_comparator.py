@@ -8,7 +8,7 @@ def compare_invoice_with_reference(rechnungsnummer, lieferant, leistung, betrag,
     """
 
     def normalize(text):
-        return str(text).strip().lower().replace(" ", "").replace("–", "-")
+        return str(text).strip().lower().replace(" ", "").replace("-", "-")
 
     normalized_input_nr = normalize(rechnungsnummer)
     normalized_input_lieferant = normalize(lieferant)

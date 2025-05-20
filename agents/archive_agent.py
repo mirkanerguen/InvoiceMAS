@@ -37,7 +37,7 @@ class ArchiveAgent:
 
         # Prüfen auf bereits archiviert
         if self.is_already_archived(rechnungsnummer):
-            return f"Archivierung abgebrochen – Rechnung {rechnungsnummer} wurde bereits archiviert."
+            return f"Archivierung abgebrochen - Rechnung {rechnungsnummer} wurde bereits archiviert."
 
         # Ordnername mit Zeitstempel
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

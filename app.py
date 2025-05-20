@@ -51,11 +51,11 @@ if uploaded_pdf:
         st.markdown("### Ergebnis der sachlichen Prüfung:")
         check_result = results.get("check", "")
         if check_result == "sachlich_korrekt":
-            st.success("Sachlich korrekt – plausibler Abgleich mit bekannten Transaktionen.")
+            st.success("Sachlich korrekt - plausibler Abgleich mit bekannten Transaktionen.")
         elif check_result == "nicht_nachvollziehbar":
-            st.error("Sachlich nicht nachvollziehbar – kein Abgleich mit interner Referenz möglich.")
+            st.error("Sachlich nicht nachvollziehbar - kein Abgleich mit interner Referenz möglich.")
         elif check_result == "unklar":
-            st.warning("Unklare KI-Antwort – manuelle Prüfung empfohlen.")
+            st.warning("Unklare KI-Antwort - manuelle Prüfung empfohlen.")
         else:
             st.info("Kein Ergebnis zur sachlichen Prüfung vorhanden.")
 
