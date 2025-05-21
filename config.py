@@ -24,11 +24,13 @@ OLLAMA_MODEL = "mistral"
 
 
 # Genehmigungsgrenzen
-APPROVAL_THRESHOLDS = {
-    1: 500.00,    # bis 500 → Mitarbeiter
-    2: 5000.00,   # bis 5000 → Teamleiter
-    3: float("inf")  # darüber → Abteilungsleiter
+APPROVAL_RULES = {
+    "employee": 500,
+    "teamlead": 5000,
+    "departmentlead": 20000,
+    "manager": float("inf")
 }
+
 
 # Debug
 DEBUG_MODE = True

@@ -1,7 +1,8 @@
 import json
 from langchain_community.llms import Ollama
 from utils.login import check_credentials
-from config import OLLAMA_MODEL, RESULTS_PATH, TEAMLEITER_ROLE, ABTEILUNGSLEITER_ROLE
+from config import OLLAMA_MODEL, RESULTS_PATH, TEAMLEITER_ROLE, ABTEILUNGSLEITER_ROLE, APPROVAL_RULES
+from utils.approval_tool import generate_approval_threshold_description
 
 class ApprovalAgent:
     def __init__(self, result_path=RESULTS_PATH):
@@ -23,24 +24,24 @@ class ApprovalAgent:
     def think(self):
         goal_text = self.goal()
 
+        thresholds_text = generate_approval_threshold_description()
+
         full_prompt = f"""
-Du bist ein autonomer Freigabe-Agent.
+        Du bist ein autonomer Freigabe-Agent.
 
-Dein Ziel lautet:
-„{goal_text}“
+        Dein Ziel lautet:
+        „{goal_text}“
 
-Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0-3)** zurück, die deine Entscheidung darstellt:
+        Lies dir den folgenden strukturierten Rechnungsauszug durch und gib **ausschließlich eine Zahl (0-{len(APPROVAL_RULES)})** zurück, die deine Entscheidung darstellt:
 
-1 = Genehmigung durch Mitarbeiter (bis 500 €)  
-2 = Genehmigung durch Teamleiter (501 bis 5000 €)  
-3 = Genehmigung durch Abteilungsleiter (ab 5001 €)  
-0 = Genehmigung verweigern
+        {thresholds_text}
 
-Rechnungsauszug:
-{self.validation_text}
+        Rechnungsauszug:
+        {self.validation_text}
 
-Antwort (nur Zahl): 
-"""
+        Antwort (nur Zahl): 
+        """
+
         print("ApprovalAgent Think(): Ziel definiert und Prompt gesendet.")
         response = self.llm.invoke(full_prompt).strip()
         print("ApprovalAgent Entscheidung:", response)

@@ -6,7 +6,7 @@ from agents.approval_agent import ApprovalAgent
 from agents.booking_agent import BookingAgent
 from agents.check_agent import CheckAgent
 from agents.archive_agent import ArchiveAgent
-from config import RESULTS_PATH, OLLAMA_MODEL
+from config import RESULTS_PATH, OLLAMA_MODEL, APPROVAL_RULES
 
 class SupervisorAgent:
     def __init__(self, pdf_path):
