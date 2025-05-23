@@ -11,6 +11,17 @@ st.title("Invoice-Workflow MAS")
 
 uploaded_pdf = st.file_uploader("Rechnung hochladen (PDF)", type="pdf")
 
+
+def markdown_table_to_df(markdown):
+    pattern = r"\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|"
+    matches = re.findall(pattern, markdown.strip())
+    if not matches or len(matches) < 2:
+        raise ValueError("Markdown-Tabelle nicht erkannt.")
+
+    headers = list(matches[0])
+    rows = matches[1:]
+    return pd.DataFrame(rows, columns=headers)
+
 if uploaded_pdf:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(uploaded_pdf.getbuffer())
@@ -30,17 +41,11 @@ if uploaded_pdf:
         # 1. Formelle Prüfung
         validation_result = results.get("validation", "")
         st.markdown("### Ergebnis der formellen Prüfung:")
-        if "|" in validation_result:
-            matches = re.findall(r'\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|', validation_result)
-            if matches:
-                header = [col.strip() for col in matches[0]]
-                data_rows = [
-                    [col.strip() for col in row]
-                    for row in matches[1:]
-                    if "---" not in row[0] and row[0] != ""
-                ]
-                df_validation = pd.DataFrame(data_rows, columns=header)
-                st.dataframe(df_validation, use_container_width=True)
+        try:
+            df_validation = markdown_table_to_df(validation_result)
+            st.dataframe(df_validation, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Tabelle konnte nicht dargestellt werden: {e}")
 
         # 2. Kostenstelle
         st.markdown("### Ergebnis der Kostenstellen-Zuordnung:")
@@ -92,3 +97,8 @@ if uploaded_pdf:
         df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
         conn.close()
         st.dataframe(df_archive, use_container_width=True)
+
+
+
+
+

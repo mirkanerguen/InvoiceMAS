@@ -78,8 +78,7 @@ class SupervisorAgent:
         # 4. Freigabe
         print("SupervisorAgent: Starte Approval-Agent.")
         approval_agent = ApprovalAgent(RESULTS_PATH)
-        decision_text = approval_agent.think()
-        approval_result = approval_agent.action(decision_text)
+        approval_result = approval_agent.run()
         self.save_results("approval", approval_result)
 
         # Prüfe, ob Genehmigung verweigert wurde
