@@ -14,6 +14,7 @@ INVOICE_FOLDER = "data/invoices/"
 ARCHIVE_FOLDER = "archive/"
 REFERENCE_DATA_PATH = "data/known_transactions.json"
 CREDENTIALS_PATH = "data/credentials.json"
+WORKFLOW_STATUS_PATH = "data/workflow_status.json"
 
 # Login-Logik
 TEAMLEITER_ROLE = "Teamleiter"

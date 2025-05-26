@@ -27,15 +27,15 @@ class ApprovalAgent:
     def prompt(self):
         return (
             "Genehmigungsregeln:\n"
-            "- 1 = Mitarbeiter (bis 500 €)\n"
-            "- 2 = Teamleiter (bis 5.000 €)\n"
-            "- 3 = Abteilungsleiter (bis 20.000 €)\n"
-            "- 4 = Manager (über 20.000 €)\n"
+            "- 1 = Mitarbeiter (bis 500 €)\n"
+            "- 2 = Teamleiter (bis 5.000 €)\n"
+            "- 3 = Abteilungsleiter (bis 20.000 €)\n"
+            "- 4 = Manager (über 20.000 €)\n"
         )
 
     def think(self):
         gedanke = (
-            f"Der Bruttobetrag der Rechnung beträgt {self.bruttobetrag:.2f} €. "
+            f"Der Bruttobetrag der Rechnung beträgt {self.bruttobetrag:.2f} €. "
             "Daher ist zu prüfen, in welchen Bereich dieser Betrag fällt, um die passende Genehmigungsrolle zu ermitteln."
         )
         print("ApprovalAgent Think():", gedanke)

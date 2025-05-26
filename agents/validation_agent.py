@@ -41,6 +41,7 @@ Achte darauf:
 - Gib ausschließlich die untenstehende Tabelle im **Markdown-Format** zurück.
 - Jede Tabellenzeile **muss in genau einer Zeile stehen**.
 - Kein Zeilenumbruch innerhalb einer Zelle!
+- Gesamtbetrag und Bruttobetrag sind das Gleiche und müssen höher als der Nettobetrag sein. 
 
 | Pflichtangabe | Vorhanden | Extrahierter Wert |
 |---------------|-----------|-------------------|
@@ -52,7 +53,7 @@ Achte darauf:
 | 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
 | 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
 | 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
-| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Netto-, (Gesamt-) Bruttobetrag, Steuerbetrag |
+| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Gesamtbetrag/Bruttobetrag, Nettobetrag, Steuerbetrag |
 | 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
 | 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
 | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |

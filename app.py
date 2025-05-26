@@ -1,104 +1,82 @@
 import streamlit as st
 from agents.supervisor_agent import SupervisorAgent
-from config import RESULTS_PATH, ARCHIVE_DB_PATH
+from config import WORKFLOW_STATUS_PATH
 import tempfile
-import pandas as pd
-import re
-import sqlite3
 import json
+import os
+import time
 
-st.title("Invoice-Workflow MAS")
+st.set_page_config(layout="wide")
+st.title("💼 Agentischer Workflow zur Rechnungsfreigabe")
 
-uploaded_pdf = st.file_uploader("Rechnung hochladen (PDF)", type="pdf")
+uploaded_pdf = st.file_uploader("Bitte Rechnung hochladen (PDF)", type="pdf")
 
 
-def markdown_table_to_df(markdown):
-    pattern = r"\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|"
-    matches = re.findall(pattern, markdown.strip())
-    if not matches or len(matches) < 2:
-        raise ValueError("Markdown-Tabelle nicht erkannt.")
+# === Initialstatus setzen ===
+def initialize_workflow_status():
+    default_status = {
+        "1_validation": 0,
+        "2_accounting": 0,
+        "3_check": 0,
+        "4_approval": 0,
+        "5_booking": 0,
+        "6_archiving": 0
+    }
+    os.makedirs(os.path.dirname(WORKFLOW_STATUS_PATH), exist_ok=True)
+    with open(WORKFLOW_STATUS_PATH, "w", encoding="utf-8") as f:
+        json.dump(default_status, f, indent=4)
 
-    headers = list(matches[0])
-    rows = matches[1:]
-    return pd.DataFrame(rows, columns=headers)
 
+# === Fortschrittsleiste visualisieren ===
+def render_status_bar(container):
+    with open(WORKFLOW_STATUS_PATH, "r", encoding="utf-8") as f:
+        status = json.load(f)
+
+    labels = {
+        "1_validation": "Validation",
+        "2_accounting": "Accounting",
+        "3_check": "Check",
+        "4_approval": "Approval",
+        "5_booking": "Booking",
+        "6_archiving": "Archiving"
+    }
+    emoji = {0: "🔴", 1: "🟡", 2: "🟢", 3: "🔵"}
+
+    with container:
+        bar = " → ".join(
+            f"{emoji[status[k]]} {labels[k]}" for k in labels
+        )
+        st.markdown(f"### 📊 Workflow-Fortschritt\n{bar}")
+
+    # Rückgabe: True, wenn alles auf grün
+    return all(v == 2 for v in status.values())
+
+
+# === Hauptprozess: Supervisor + Live-Update ===
 if uploaded_pdf:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(uploaded_pdf.getbuffer())
         tmp_pdf_path = tmp_file.name
 
+    initialize_workflow_status()
     supervisor = SupervisorAgent(tmp_pdf_path)
 
+    status_container = st.empty()  # Live-Fortschritt
+    render_status_bar(status_container)
     if st.button("Workflow starten"):
-        with st.spinner("Workflow läuft..."):
+        st.info("Supervisor startet den Workflow. Fortschritt unten sichtbar:")
+
+        workflow_done = False
+        while not workflow_done:
             result = supervisor.action()
+            workflow_done = render_status_bar(status_container)
+            time.sleep(1.2)  # UI-Update sichtbar machen
 
-        st.success("Workflow abgeschlossen!")
+        st.success("✅ Workflow erfolgreich abgeschlossen!")
 
-        with open(RESULTS_PATH, "r", encoding="utf-8") as f:
+        # Ergebnis-Anzeige aus results.json
+        st.markdown("### 🧾 Ergebnisse aus results.json")
+        with open("data/results.json", "r", encoding="utf-8") as f:
             results = json.load(f)
-
-        # 1. Formelle Prüfung
-        validation_result = results.get("validation", "")
-        st.markdown("### Ergebnis der formellen Prüfung:")
-        try:
-            df_validation = markdown_table_to_df(validation_result)
-            st.dataframe(df_validation, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Tabelle konnte nicht dargestellt werden: {e}")
-
-        # 2. Kostenstelle
-        st.markdown("### Ergebnis der Kostenstellen-Zuordnung:")
-        cost_center = results.get("accounting", "Nicht zugewiesen")
-        st.success(f"Zugeordnete Kostenstelle: **{cost_center}**")
-
-        # 3. Sachliche Prüfung
-        st.markdown("### Ergebnis der sachlichen Prüfung:")
-        check_result = results.get("check", "")
-        if check_result == "sachlich_korrekt":
-            st.success("Sachlich korrekt - plausibler Abgleich mit bekannten Transaktionen.")
-        elif check_result == "nicht_nachvollziehbar":
-            st.error("Sachlich nicht nachvollziehbar - kein Abgleich mit interner Referenz möglich.")
-        elif check_result == "unklar":
-            st.warning("Unklare KI-Antwort - manuelle Prüfung empfohlen.")
-        else:
-            st.info("Kein Ergebnis zur sachlichen Prüfung vorhanden.")
-
-        # 4. Freigabe
-        st.markdown("### Ergebnis der finalen Freigabe:")
-        approval_text = results.get("approval", "")
-        if isinstance(approval_text, str) and "Genehmigt" in approval_text:
-            st.success(approval_text)
-        elif isinstance(approval_text, str) and "Verweigert" in approval_text:
-            st.error(approval_text)
-        else:
-            st.warning("Keine Freigabeentscheidung erfolgt.")
-
-        # 5. Buchung
-        st.markdown("### Ergebnis der Buchung:")
-        booking_text = results.get("booking", "")
-        if "gebucht" in booking_text.lower():
-            st.success(booking_text)
-        elif "abgebrochen" in booking_text.lower():
-            st.warning(booking_text)
-        elif "offen" in booking_text.lower():
-            st.info("Noch keine Buchung erfolgt.")
-        else:
-            st.error("Unbekannter Buchungsstatus.")
-
-        # 6. Archivierung
-        st.markdown("### Archivierung:")
-        archive_info = results.get("archive", "Keine Archivierungsinformationen.")
-        st.info(archive_info)
-
-        # 7. Historie (Archivierte Rechnungen)
-        st.markdown("### Archivierte Rechnungen:")
-        conn = sqlite3.connect(ARCHIVE_DB_PATH)
-        df_archive = pd.read_sql_query("SELECT * FROM archive", conn)
-        conn.close()
-        st.dataframe(df_archive, use_container_width=True)
-
-
-
-
+        st.json(results, expanded=True)
 
