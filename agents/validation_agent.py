@@ -5,7 +5,6 @@ from langchain.prompts import PromptTemplate
 from utils.pdf_parser import extract_text_from_pdf
 from config import OLLAMA_MODEL, OWN_COMPANY_FULL
 
-
 class ValidationAgent:
     def __init__(self, pdf_path):
         self.pdf_path = pdf_path
@@ -15,7 +14,31 @@ class ValidationAgent:
     def goal(self):
         return "Alle Pflichtangaben gemäß §14 UStG müssen vorhanden und korrekt extrahiert sein."
 
-    def prompt(self):
+    def prompt(self, missing_fields=None):
+        full_table = [
+            "1. Name & Anschrift des leistenden Unternehmers",
+            "2. Name & Anschrift des Leistungsempfängers",
+            "3. Steuernummer des Unternehmers",
+            "4. Umsatzsteuer-ID des Unternehmers",
+            "5. Ausstellungsdatum",
+            "6. Fortlaufende Rechnungsnummer",
+            "7. Menge und Art der gelieferten Leistung",
+            "8. Zeitpunkt der Leistung oder Leistungszeitraum",
+            "9. Entgelt nach Steuersätzen aufgeschlüsselt",
+            "10. Steuersatz oder Hinweis auf Steuerbefreiung",
+            "11. Hinweis auf Aufbewahrungspflicht (§14b UStG)",
+            "12. Angabe „Gutschrift“ (falls zutreffend)"
+        ]
+
+        if missing_fields:
+            relevant_rows = [row for row in full_table if any(field.strip().lower() in row.lower() for field in missing_fields)]
+        else:
+            relevant_rows = full_table
+
+        table_rows = "\n".join(
+            f"| {row} | Ja/Nein | Wert |" for row in relevant_rows
+        )
+
         return PromptTemplate(
             input_variables=["invoice_text", "agent_thoughts"],
             template=f"""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
@@ -35,13 +58,13 @@ Solltest du diese Angaben im Rechnungstext finden, trage sie in der Tabelle unte
 **Hinweis zur Steuernummer und USt-ID:**  
 Laut §14 Abs. 4 Nr. 2 UStG muss **entweder die Steuernummer oder die USt-IdNr.** angegeben sein. Wenn **eine der beiden Angaben vorhanden ist**, gilt die Pflichtangabe als erfüllt.
 
-Achte zudem auf die **korrekte Unterscheidung** zwischen leistendem Unternehmer (stellt Rechnung) und Leistungsempfänger (empfängt die Leistung, unsere Firma).
-
-Achte darauf:
+Achte auf:
 - Gib ausschließlich die untenstehende Tabelle im **Markdown-Format** zurück.
 - Jede Tabellenzeile **muss in genau einer Zeile stehen**.
 - Kein Zeilenumbruch innerhalb einer Zelle!
 - Gesamtbetrag und Bruttobetrag sind das Gleiche und müssen höher als der Nettobetrag sein. 
+
+{table_rows}
 
 | Pflichtangabe | Vorhanden | Extrahierter Wert |
 |---------------|-----------|-------------------|
@@ -58,9 +81,9 @@ Achte darauf:
 | 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
 | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
 
+
 Rechnungstext:
-{{invoice_text}}
-"""
+{{invoice_text}}"""
         )
 
     def think(self):
@@ -100,7 +123,7 @@ Antworte kurz und präzise mit einem Satz."""
         # Debug-Ausgabe
         print("ValidationAgent Raw Output:\n", result)
 
-        # Robustere Umwandlung des LLM-Outputs in Tabellenformat
+        # Robustere Umwandlung
         result = result.replace("\n", " ")
         result = re.sub(r"\|\s*(\d+\.)", r"\n|\1", result)
 
@@ -108,9 +131,16 @@ Antworte kurz und präzise mit einem Satz."""
         print("ValidationAgent Action(): Daten extrahiert.")
         return clean_result
 
-    def run(self):
+    def run(self, missing_fields=None):
         thoughts = self.think()
-        return self.action(thoughts)
+        if missing_fields:
+            prompt_template = self.prompt(missing_fields)
+            return self.action(thoughts, custom_prompt=prompt_template.format(
+                invoice_text=self.invoice_text,
+                agent_thoughts=thoughts
+            ))
+        else:
+            return self.action(thoughts)
 
     def run_with_prompt(self, improved_prompt):
         thoughts = self.think()

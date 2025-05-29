@@ -30,22 +30,31 @@ class BookingAgent:
 
     def extract_amount_with_llm(self, validation_text: str) -> str:
         prompt = f"""
-    Du bist ein Buchhaltungsassistent. Extrahiere aus dem folgenden Text den **Bruttobetrag der Rechnung** in Euro.
+    Du bist ein Buchhaltungsassistent. Extrahiere aus dem folgenden Text den **Brutto-Betrag oder Gesamtbetrag der Rechnung** in Euro.
     Text:
     {validation_text}
 
-    Gib nur den Betrag in dieser Form zurück, z. B.: 1200.00
+    Gib nur den Betrag in dieser Form zurück, z. B.: 1200.00
+    Brutto-Betrag und Gesamtbetrag sollte dieselbe Zahl sein. Hinweis: Meistens ist der Gesamtbetrag die grösste Zahl.
     """
         response = self.llm.invoke(prompt).strip()
+        match = re.search(r"([\d\.,]+)", response)
 
-        match = re.search(r"([\d]+[\.,]?[\d]*)", response)
         if match:
             betrag = match.group(1).replace(",", ".")
             try:
-                float(betrag)
-                return betrag
+                betrag_float = float(betrag)
+                # Optional: Überprüfung, ob Betrag in der Validierungszeile 9 vorkommt
+                if str(int(betrag_float)) in validation_text:
+                    return betrag
             except ValueError:
                 pass
+
+        # Fallback mit direkter Regex auf Pflichtangabe 9
+        print("LLM konnte Bruttobetrag nicht zuverlässig extrahieren – Fallback wird verwendet.")
+        fallback = re.search(r"9\. Entgelt.*?(?:Gesamt|Brutto).*?([\d\.,]+)", validation_text.replace("\n", " "))
+        if fallback:
+            return fallback.group(1).replace(",", ".")
         return "0.00"
 
     def action(self):

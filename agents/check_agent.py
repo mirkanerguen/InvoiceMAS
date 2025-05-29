@@ -1,3 +1,4 @@
+# check_agent.py
 import json
 import re
 from langchain_community.llms import Ollama
@@ -16,7 +17,6 @@ class CheckAgent:
         return "Prüfe die sachliche Richtigkeit einer Rechnung mit Fokus auf exakte Rechnungsnummer und semantisch plausible Übereinstimmung weiterer Felder."
 
     def think(self):
-        print("CheckAgent Think(): Extrahiere relevante Felder.")
         return {
             "rechnungsnummer": self._extract("6. Fortlaufende Rechnungsnummer"),
             "lieferant": self._extract("1. Name & Anschrift des leistenden Unternehmers"),
@@ -33,7 +33,7 @@ class CheckAgent:
         )
 
         if not referenz:
-            print("CheckAgent Action(): Rechnungsnummer nicht bekannt → nicht nachvollziehbar.")
+            self._save_result("nicht_nachvollziehbar")
             return "nicht_nachvollziehbar"
 
         referenzliste = (
@@ -73,14 +73,25 @@ Wenn alles plausibel übereinstimmt, antworte mit "sachlich_korrekt", sonst mit 
         result = self.llm.invoke(prompt).strip().lower()
 
         if result == "sachlich_korrekt":
-            print("CheckAgent Action(): sachlich korrekt (LLM-Einschätzung)")
+            self._save_result("sachlich_korrekt")
             return "sachlich_korrekt"
+
         elif result == "nicht_nachvollziehbar":
-            print("CheckAgent Action(): nicht nachvollziehbar (LLM-Einschätzung)")
+            self._save_result("nicht_nachvollziehbar")
             return "nicht_nachvollziehbar"
-        else:
-            print("CheckAgent Action(): unklar - LLM-Antwort nicht eindeutig.")
-            return "unklar"
+
+        self._save_result("unklar")
+        return "unklar"
+
+    def _save_result(self, result_value):
+        try:
+            with open(RESULTS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {}
+        data["check"] = result_value
+        with open(RESULTS_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
 
     def _extract(self, label):
         pattern = fr"\|\s*{label}.*?\|\s*(Ja|Nein|Fehlt)\s*\|\s*(.*?)\|"

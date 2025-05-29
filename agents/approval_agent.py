@@ -19,7 +19,7 @@ class ApprovalAgent:
             self.data = json.load(f)
 
         self.validation_text = self.data.get("validation", "")
-        self.bruttobetrag = float(self.extract_bruttobetrag(self.validation_text))
+        self.bruttobetrag = float(self.extract_bruttobetrag_with_llm(self.validation_text))
 
     def goal(self):
         return "Anhand des Bruttobetrags die richtige Genehmigungsrolle bestimmen."
@@ -40,6 +40,27 @@ class ApprovalAgent:
         )
         print("ApprovalAgent Think():", gedanke)
         return gedanke
+
+    def extract_bruttobetrag_with_llm(self, validation_text: str) -> str:
+        prompt = f"""
+Du bist ein Genehmigungsassistent. Extrahiere aus folgendem Text den **Bruttobetrag/Gesamtbetrag der Rechnung** in Euro. 
+Berücksichtige ausschließlich die Angabe aus Zeile 9 der Tabelle ("Entgelt nach Steuersätzen aufgeschlüsselt").
+
+Text:
+{validation_text}
+
+Gib nur den Betrag in dieser Form zurück, z. B.: 2915.50
+"""
+        response = self.llm.invoke(prompt).strip()
+
+        match = re.search(r"([\d]+[\.,]?[\d]*)", response)
+        if match:
+            betrag = match.group(1).replace(",", ".")
+            try:
+                return betrag
+            except ValueError:
+                pass
+        return "0.00"
 
     def action(self):
         entscheidung = map_bruttobetrag_to_role(self.bruttobetrag)
@@ -88,19 +109,3 @@ class ApprovalAgent:
     def run(self):
         self.think()
         return self.action()
-
-    def extract_bruttobetrag(self, text):
-        brutto_match = re.search(r"brutto.*?:\s*([\d\.,]+)", text.lower())
-        if brutto_match:
-            return brutto_match.group(1).replace(".", "").replace(",", ".")
-
-        netto_match = re.search(r"netto.*?:\s*([\d\.,]+)", text.lower())
-        steuer_match = re.search(r"steuer(?:betrag)?[:\s]*([\d\.,]+)", text.lower())
-        if netto_match and steuer_match:
-            try:
-                netto = float(netto_match.group(1).replace(".", "").replace(",", "."))
-                steuer = float(steuer_match.group(1).replace(".", "").replace(",", "."))
-                return str(round(netto + steuer, 2))
-            except:
-                pass
-        return "0.00"
