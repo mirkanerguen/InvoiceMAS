@@ -36,6 +36,7 @@ class BookingAgent:
 
     Gib nur den Betrag in dieser Form zurück, z. B.: 1200.00
     Brutto-Betrag und Gesamtbetrag sollte dieselbe Zahl sein. Hinweis: Meistens ist der Gesamtbetrag die grösste Zahl.
+    Gib NICHT den Betrag zurück, bei dem das Wort "netto" enthalten ist.
     """
         response = self.llm.invoke(prompt).strip()
         match = re.search(r"([\d\.,]+)", response)

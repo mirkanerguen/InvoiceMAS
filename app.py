@@ -24,6 +24,13 @@ def initialize_workflow_status():
     with open(WORKFLOW_STATUS_PATH, "w", encoding="utf-8") as f:
         json.dump(default_status, f, indent=4)
 
+def clear_results_json():
+    empty_data = {}
+    os.makedirs(os.path.dirname("data/results.json"), exist_ok=True)
+    with open("data/results.json", "w", encoding="utf-8") as f:
+        json.dump(empty_data, f, indent=4)
+
+
 # === Fortschrittsleiste visualisieren ===
 def render_status_bar(container):
     with open(WORKFLOW_STATUS_PATH, "r", encoding="utf-8") as f:
@@ -61,7 +68,9 @@ if uploaded_pdf:
 
     if st.session_state.supervisor is None:
         initialize_workflow_status()
+        clear_results_json()
         st.session_state.supervisor = SupervisorAgent(tmp_pdf_path)
+
 
     status_container = st.empty()
     render_status_bar(status_container)
