@@ -9,12 +9,14 @@ class CheckAgent:
     def __init__(self, validation_result_path=RESULTS_PATH, reference_path=REFERENCE_DATA_PATH):
         self.llm = Ollama(model=OLLAMA_MODEL)
         with open(validation_result_path, "r", encoding="utf-8") as f:
-            self.data = json.load(f).get("validation", "")
+            self.raw_data = json.load(f).get("validation", "")
         with open(reference_path, "r", encoding="utf-8") as f:
             self.known = json.load(f).get("invoices", [])
 
+        self.data = self._normalize_text(self.raw_data)
+
     def goal(self):
-        return "Prüfe die sachliche Richtigkeit einer Rechnung mit Fokus auf exakte Rechnungsnummer und semantisch plausible Übereinstimmung weiterer Felder."
+        return "Prüfe die sachliche Richtigkeit einer Rechnung mit Fokus auf Rechnungsnummer, plausiblen Lieferanten, Leistung und Bruttobetrag."
 
     def think(self):
         return {
@@ -27,6 +29,7 @@ class CheckAgent:
     def action(self):
         extracted = self.think()
         brutto = self._extract_bruttobetrag(extracted["betrag"])
+
         referenz = next(
             (r for r in self.known if r["rechnungsnummer"].strip() == extracted["rechnungsnummer"].strip()),
             None
@@ -36,47 +39,54 @@ class CheckAgent:
             self._save_result("nicht_nachvollziehbar")
             return "nicht_nachvollziehbar"
 
-        referenzliste = (
-            f"- Rechnungsnr: {referenz['rechnungsnummer']}, Lieferant: {referenz['lieferant']}, "
-            f"Leistung: {referenz['leistung']}, Brutto: {referenz['betrag_brutto']} €"
+        referenz_text = (
+            f"Rechnungsnummer: {referenz['rechnungsnummer']}\n"
+            f"Lieferant: {referenz['lieferant']}\n"
+            f"Leistung: {referenz['leistung']}\n"
+            f"Brutto: {referenz['betrag_brutto']:.2f} EUR"
         )
         rechnung_text = (
             f"Rechnungsnummer: {extracted['rechnungsnummer']}\n"
             f"Lieferant: {extracted['lieferant']}\n"
             f"Leistung: {extracted['leistung']}\n"
-            f"Brutto-Betrag: {brutto} EUR"
+            f"Brutto: {brutto} EUR"
         )
 
         prompt_template = PromptTemplate(
             input_variables=["ziel", "rechnung", "referenz"],
-            template="""Du bist ein KI-Agent zur sachlichen Prüfung einer Rechnung.
+            template="""
+Du bist ein KI-Agent für Rechnungsprüfung.
 
-Dein Ziel lautet: {ziel}
+Aufgabe: {ziel}
 
-Hier ist die zu prüfende Rechnung:
+Prüfe, ob folgende Inhalte sachlich plausibel übereinstimmen:
+
+📄 Rechnung:
 {rechnung}
 
-Hier ist die bekannte Referenzrechnung:
+📑 Referenzdaten:
 {referenz}
 
-Vergleiche die Inhalte. Achte auf sinngemäße Übereinstimmung bei Lieferant, Leistung und Bruttobetrag.
-Wenn alles plausibel übereinstimmt, antworte mit "sachlich_korrekt", sonst mit "nicht_nachvollziehbar".
+🔍 Kriterien:
+- Lieferant darf sprachlich leicht abweichen, aber inhaltlich gleich sein.
+- Leistung kann in anderer Reihenfolge oder Formulierung vorliegen.
+- Bruttobetrag darf max. um 0.01 € abweichen.
+- Wenn alles inhaltlich passt → "sachlich_korrekt", sonst "nicht_nachvollziehbar".
 """
         )
 
         prompt = prompt_template.format(
             ziel=self.goal(),
             rechnung=rechnung_text,
-            referenz=referenzliste
+            referenz=referenz_text
         )
 
         result = self.llm.invoke(prompt).strip().lower()
 
-        if result == "sachlich_korrekt":
+        if "sachlich_korrekt" in result:
             self._save_result("sachlich_korrekt")
             return "sachlich_korrekt"
-
-        elif result == "nicht_nachvollziehbar":
+        elif "nicht_nachvollziehbar" in result:
             self._save_result("nicht_nachvollziehbar")
             return "nicht_nachvollziehbar"
 
@@ -99,5 +109,11 @@ Wenn alles plausibel übereinstimmt, antworte mit "sachlich_korrekt", sonst mit 
         return match.group(2).strip() if match else "unbekannt"
 
     def _extract_bruttobetrag(self, betrag_text):
-        match = re.search(r"Brutto[: ]*([\d\.,]+)", betrag_text)
+        match = re.search(r"gesamt[:\s]*([\d\.,]+)", betrag_text.lower())
         return match.group(1).replace(",", ".") if match else "0.00"
+
+    def _normalize_text(self, text):
+        text = text.replace("<br>", ", ")
+        text = text.replace("€", "EUR")
+        text = text.replace("\u00a0", " ")
+        return text

@@ -62,8 +62,10 @@ Achte auf:
 - Gib ausschließlich die untenstehende Tabelle im **Markdown-Format** zurück.
 - Jede Tabellenzeile **muss in genau einer Zeile stehen**.
 - Kein Zeilenumbruch innerhalb einer Zelle!
-- Gesamtbetrag und Bruttobetrag sind das Gleiche und müssen höher als der Nettobetrag sein. 
-- Gib den Nettobetrag niemals als "Gesamt-" an
+
+Achte streng auf die Unterscheidung zwischen Nettobetrag, Steuerbetrag und Bruttobetrag.
+Der Bruttobetrag ist die Summe aus Nettobetrag + Steuerbetrag.
+Gib niemals den Nettobetrag als "Gesamtbetrag" an - das ist falsch.
 
 {table_rows}
 
@@ -77,7 +79,7 @@ Achte auf:
 | 6. Fortlaufende Rechnungsnummer | Ja/Nein | Rechnungsnummer |
 | 7. Menge und Art der gelieferten Leistung | Ja/Nein | Aufzählung der Leistungen (kurz) |
 | 8. Zeitpunkt der Leistung oder Leistungszeitraum | Ja/Nein | Zeitraum oder Datum |
-| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Gesamtbetrag oder Bruttobetrag, Nettobetrag (ohne Gesamt), Steuerbetrag |
+| 9. Entgelt nach Steuersätzen aufgeschlüsselt | Ja/Nein | Nettobetrag, Steuerbetrag, Bruttobetrag (Gesamtbetrag = Netto + Steuer) |
 | 10. Steuersatz oder Hinweis auf Steuerbefreiung | Ja/Nein | Steuersatz oder Hinweis |
 | 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
 | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |

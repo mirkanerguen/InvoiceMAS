@@ -29,34 +29,46 @@ class BookingAgent:
         return count > 0
 
     def extract_amount_with_llm(self, validation_text: str) -> str:
+        # 1. LLM-basiertes Extrahieren
         prompt = f"""
-    Du bist ein Buchhaltungsassistent. Extrahiere aus dem folgenden Text den **Brutto-Betrag oder Gesamtbetrag der Rechnung** in Euro.
-    Text:
+    Du bist ein Buchhaltungsassistent. Extrahiere aus folgendem Text den **Brutto- oder Gesamtbetrag der Rechnung** in Euro.
+
+    Der Text stammt aus Zeile 9 der extrahierten Rechnungstabelle gemäß §14 UStG (Entgelt nach Steuersätzen aufgeschlüsselt).  
+    Beispiel: "2.450,00 € (Netto), 465,50 € (Steuer), 2.915,50 € (Brutto)"
+
+    Deine Aufgabe:
+    - Ignoriere alle Netto- oder Steuerbeträge.
+    - Wähle die höchste Zahl im Kontext von "Brutto" oder "Gesamt".
+    - Gib **nur den Betrag**, **ohne Währungszeichen oder Text**, **mit Punkt** als Dezimaltrenner zurück, z. B.: 2915.50
+
+    Hier der Text:
     {validation_text}
 
-    Gib nur den Betrag in dieser Form zurück, z. B.: 1200.00
-    Brutto-Betrag und Gesamtbetrag sollte dieselbe Zahl sein. Hinweis: Meistens ist der Gesamtbetrag die grösste Zahl.
-    Gib NICHT den Betrag zurück, bei dem das Wort "netto" enthalten ist.
+    Antwort:
     """
         response = self.llm.invoke(prompt).strip()
-        match = re.search(r"([\d\.,]+)", response)
 
+        match = re.search(r"([\d]+[\.,]?[\d]*)", response)
         if match:
             betrag = match.group(1).replace(",", ".")
             try:
                 betrag_float = float(betrag)
-                # Optional: Überprüfung, ob Betrag in der Validierungszeile 9 vorkommt
-                if str(int(betrag_float)) in validation_text:
-                    return betrag
+                if betrag_float >= 100:  # realistische Untergrenze für Rechnungsbeträge
+                    return f"{betrag_float:.2f}"
             except ValueError:
                 pass
 
-        # Fallback mit direkter Regex auf Pflichtangabe 9
-        print("LLM konnte Bruttobetrag nicht zuverlässig extrahieren – Fallback wird verwendet.")
-        fallback = re.search(r"9\. Entgelt.*?(?:Gesamt|Brutto).*?([\d\.,]+)", validation_text.replace("\n", " "))
-        if fallback:
-            return fallback.group(1).replace(",", ".")
+        # 2. Fallback: größte Zahl im Text
+        print("⚠️ LLM konnte Betrag nicht zuverlässig extrahieren – Fallback aktiv.")
+        zahlen = re.findall(r"[\d]+[\.,][\d]+", validation_text.replace(",", "."))
+        zahlen_float = [float(z) for z in zahlen]
+
+        if zahlen_float:
+            max_betrag = max(zahlen_float)
+            return f"{max_betrag:.2f}"
+
         return "0.00"
+
 
     def action(self):
         gedanke = self.think()
