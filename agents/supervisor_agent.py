@@ -12,12 +12,18 @@ from config import RESULTS_PATH, OLLAMA_MODEL, WORKFLOW_STATUS_PATH
 
 class SupervisorAgent:
     def __init__(self, pdf_path):
+        # LLM und Pfad speichern
         self.llm = Ollama(model=OLLAMA_MODEL)
         self.pdf_path = pdf_path
+
+        # ValidationAgent vorbereiten
         self.validation_agent = ValidationAgent(pdf_path)
         self.results = {}
+
+        # Workflow-Status laden
         self.workflow = self.load_workflow_status()
 
+        # Reihenfolge der Agenten im Workflow
         self.steps = [
             ("validation", lambda: self.validation_agent.run()),
             ("accounting", lambda: AccountingAgent(RESULTS_PATH).action()),
@@ -28,14 +34,17 @@ class SupervisorAgent:
         ]
 
     def load_workflow_status(self):
+        # Lade aktuellen Status des Workflows (z. B. grün, gelb, rot)
         with open(WORKFLOW_STATUS_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def save_workflow_status(self):
+        # Speichere den Workflow-Status zurück ins JSON
         with open(WORKFLOW_STATUS_PATH, "w", encoding="utf-8") as f:
             json.dump(self.workflow, f, indent=4)
 
     def save_results(self, step, result):
+        # Zwischenergebnisse in results.json sichern
         try:
             with open(RESULTS_PATH, "r", encoding="utf-8") as f:
                 self.results = json.load(f)
@@ -48,6 +57,7 @@ class SupervisorAgent:
             json.dump(self.results, f, indent=4)
 
     def step_to_key(self, step_name):
+        # Übersetzt Schrittname in Key des Workflow-Status
         mapping = {
             "validation": "1_validation",
             "accounting": "2_accounting",
@@ -59,16 +69,19 @@ class SupervisorAgent:
         return mapping.get(step_name, step_name)
 
     def extract_missing_fields(self, validation_text: str) -> list:
+        # Extrahiert alle Pflichtfelder (1–10), die fehlen oder auf "Nein" stehen
         pattern = r"\|\s*(\d+\..*?)\s*\|\s*(Nein|Fehlt)\s*\|"
         matches = re.findall(pattern, validation_text)
         return [feld for feld, status in matches if feld.strip().startswith(tuple(f"{i}." for i in range(1, 11)))]
 
     def rerun_validation_for_missing(self, fehlende_felder: list) -> str:
+        # Führt den ValidationAgent gezielt nochmal aus mit nur den fehlenden Feldern
         print("SupervisorAgent: Starte gezielte Nachprüfung im ValidationAgent.")
         agent = ValidationAgent(self.pdf_path)
         return agent.run(missing_fields=fehlende_felder)
 
     def merge_validation_results(self, original: str, improved: str) -> str:
+        # Kombiniert alte Tabelle mit neu extrahierten Feldern (ersetzt fehlende Einträge)
         original_lines = original.splitlines()
         improved_lines = improved.splitlines()
         updated = []
@@ -82,6 +95,7 @@ class SupervisorAgent:
         return "\n".join(updated)
 
     def think(self, agent_result, step):
+        # LLM-Evaluation: Prüfe, ob der Agent alles korrekt geliefert hat
         prompt = (
             f"Du prüfst den Schritt '{step}'. Ergebnis: {agent_result}. "
             "Ist das Ergebnis vollständig und korrekt nach §14 UStG? Antworte nur mit 'ja' oder 'nein' "
@@ -94,6 +108,7 @@ class SupervisorAgent:
         result = agent_fn()
         self.save_results(step, result)
 
+        # Nachlauf-Logik: Validation mit Pflichtfeldprüfung
         if step == "validation":
             fehlende_felder = self.extract_missing_fields(result)
             if fehlende_felder:
@@ -102,6 +117,7 @@ class SupervisorAgent:
                 result = self.merge_validation_results(result, improved_result)
                 self.save_results(step, result)
 
+        # Nachlauf-Logik: Genehmigung – falls verweigert → Workflowabbruch
         if step == "approval":
             with open(RESULTS_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -114,11 +130,13 @@ class SupervisorAgent:
                 self.save_workflow_status()
                 return result
 
+        # Accounting = immer Status 2
         if step == "accounting":
             self.workflow[self.step_to_key(step)] = 2
             self.save_workflow_status()
             return result
 
+        # CheckAgent: Bei "nicht nachvollziehbar" → Nutzer entscheidet
         if step == "check":
             if self.results.get("check") == "nicht_nachvollziehbar":
                 user_decision = input("Sachliche Prüfung nicht nachvollziehbar. Trotzdem fortfahren? (ja/nein): ").strip().lower()
@@ -135,7 +153,7 @@ class SupervisorAgent:
                 self.save_workflow_status()
                 return result
 
-        # Standard: LLM-Evaluation für alle anderen Schritte
+        # Für alle übrigen Schritte: LLM evaluiert ob Ergebnis okay war
         thought = self.think(result, step)
         if "nein" in thought:
             self.workflow[self.step_to_key(step)] = 1
@@ -146,6 +164,7 @@ class SupervisorAgent:
         return result
 
     def next_step(self):
+        # Führt den nächsten fälligen Schritt im Workflow aus
         if any(v == 3 for v in self.workflow.values()):
             return "Abbruch"
 
@@ -167,6 +186,7 @@ class SupervisorAgent:
         return "Done"
 
     def action(self):
+        # Hauptmethode: führt alle Schritte in Schleife aus, bis "Done" oder Fehler
         while True:
             result = self.next_step()
             if result == "Done" or "Abbruch" in result:

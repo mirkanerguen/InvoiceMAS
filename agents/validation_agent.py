@@ -7,14 +7,21 @@ from config import OLLAMA_MODEL, OWN_COMPANY_FULL
 
 class ValidationAgent:
     def __init__(self, pdf_path):
+        # PDF-Pfad speichern
         self.pdf_path = pdf_path
+
+        # Text aus der PDF extrahieren
         self.invoice_text = extract_text_from_pdf(pdf_path)
+
+        # Modellinstanz initialisieren
         self.llm = Ollama(model=OLLAMA_MODEL)
 
     def goal(self):
+        # Zieldefinition für Prompt
         return "Alle Pflichtangaben gemäß §14 UStG müssen vorhanden und korrekt extrahiert sein."
 
     def prompt(self, missing_fields=None):
+        # Liste aller Pflichtfelder gemäß §14 Abs. 4 UStG
         full_table = [
             "1. Name & Anschrift des leistenden Unternehmers",
             "2. Name & Anschrift des Leistungsempfängers",
@@ -30,15 +37,18 @@ class ValidationAgent:
             "12. Angabe „Gutschrift“ (falls zutreffend)"
         ]
 
+        # Wenn fehlende Felder angegeben sind, nur diese verwenden
         if missing_fields:
             relevant_rows = [row for row in full_table if any(field.strip().lower() in row.lower() for field in missing_fields)]
         else:
             relevant_rows = full_table
 
+        # Formatierte Tabelle für Prompt erzeugen
         table_rows = "\n".join(
             f"| {row} | Ja/Nein | Wert |" for row in relevant_rows
         )
 
+        # PromptTemplate definieren
         return PromptTemplate(
             input_variables=["invoice_text", "agent_thoughts"],
             template=f"""Du bist ein KI-Agent zur präzisen Prüfung und Extraktion der sachlichen Richtigkeit einer Rechnung gemäß §14 UStG.
@@ -84,12 +94,12 @@ Gib niemals den Nettobetrag als "Gesamtbetrag" an - das ist falsch.
 | 11. Hinweis auf Aufbewahrungspflicht (§14b UStG) | Ja/Nein | Exakt "Hinweis vorhanden" oder "Fehlt" |
 | 12. Angabe „Gutschrift“ (falls zutreffend) | Ja/Nein | Exakt "Gutschrift" oder "Fehlt" |
 
-
 Rechnungstext:
 {{invoice_text}}"""
         )
 
     def think(self):
+        # Prompt zur Beschreibung der nächsten Handlung erzeugen
         thought_prompt = PromptTemplate(
             input_variables=["invoice_text", "goal"],
             template="""Du bist ein intelligenter KI-Agent, der eine Rechnung prüft.
@@ -103,6 +113,7 @@ Rechnungstext: {invoice_text}
 Antworte kurz und präzise mit einem Satz."""
         )
 
+        # Prompt ausfüllen und an LLM senden
         formatted_thought_prompt = thought_prompt.format(
             invoice_text=self.invoice_text,
             goal=self.goal()
@@ -113,6 +124,7 @@ Antworte kurz und präzise mit einem Satz."""
         return agent_thoughts.strip()
 
     def action(self, agent_thoughts, custom_prompt=None):
+        # Entweder benutzerdefinierter Prompt oder Standardprompt verwenden
         if custom_prompt:
             formatted_prompt = custom_prompt
         else:
@@ -121,12 +133,13 @@ Antworte kurz und präzise mit einem Satz."""
                 agent_thoughts=agent_thoughts
             )
 
+        # Prompt an LLM senden
         result = self.llm.invoke(formatted_prompt)
 
-        # Debug-Ausgabe
+        # Debug-Ausgabe für Rohantwort
         print("ValidationAgent Raw Output:\n", result)
 
-        # Robustere Umwandlung
+        # Umwandlung in lesbares Markdown-Format
         result = result.replace("\n", " ")
         result = re.sub(r"\|\s*(\d+\.)", r"\n|\1", result)
 
@@ -135,6 +148,7 @@ Antworte kurz und präzise mit einem Satz."""
         return clean_result
 
     def run(self, missing_fields=None):
+        # Hauptmethode: Durchführung mit oder ohne gezielte Pflichtfelder
         thoughts = self.think()
         if missing_fields:
             prompt_template = self.prompt(missing_fields)
@@ -146,10 +160,12 @@ Antworte kurz und präzise mit einem Satz."""
             return self.action(thoughts)
 
     def run_with_prompt(self, improved_prompt):
+        # Lauf mit verbessertem Prompt (z. B. für Re-Runs vom Supervisor)
         thoughts = self.think()
         return self.action(thoughts, custom_prompt=improved_prompt)
 
     def run_with_user_input(self, missing_info):
+        # Fallback: User hat fehlende Angabe manuell ergänzt
         user_input_prompt = self.prompt().format(
             invoice_text=f"{self.invoice_text}\n\nVom User ergänzte Information: {missing_info}",
             agent_thoughts="Der User hat die fehlende Information ergänzt."
@@ -157,6 +173,7 @@ Antworte kurz und präzise mit einem Satz."""
         return self.action("User-ergänzte Eingabe", custom_prompt=user_input_prompt)
 
     def to_dataframe(self, markdown_table):
+        # Wandelt die extrahierte Tabelle in ein pandas DataFrame um
         pattern = r"\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|"
         matches = re.findall(pattern, markdown_table.replace("\n", ""))
 
