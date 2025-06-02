@@ -121,7 +121,7 @@ class SupervisorAgent:
 
         if step == "check":
             if self.results.get("check") == "nicht_nachvollziehbar":
-                user_decision = input("⚠️ Sachliche Prüfung nicht nachvollziehbar. Trotzdem fortfahren? (ja/nein): ").strip().lower()
+                user_decision = input("Sachliche Prüfung nicht nachvollziehbar. Trotzdem fortfahren? (ja/nein): ").strip().lower()
                 if user_decision != "ja":
                     self.workflow[self.step_to_key(step)] = 3
                     self.save_workflow_status()
