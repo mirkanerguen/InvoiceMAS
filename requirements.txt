@@ -1,6 +1,7 @@
 langchain
+langchain-community
 streamlit
 pypdf
+pandas
 ollama
 python-dotenv
-
