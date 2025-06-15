@@ -4,7 +4,7 @@
 OWN_COMPANY_NAME = "Karbo-Power UG"
 OWN_COMPANY_ADDRESS = "Gutenbergstraße 32, 35043 Marburg"
 OWN_COMPANY_FULL = f"{OWN_COMPANY_NAME}, {OWN_COMPANY_ADDRESS}"
-# Wird im ValidationAgent verwendet, um Leistungsempfänger automatisch zu erkennen.
+
 
 # === Archivverzeichnis für Ergebnisse und Originalrechnungen ===
 ARCHIVE_DIR = "archive"
@@ -33,5 +33,3 @@ APPROVAL_RULES = {
     "manager": float("inf")     # über 20.000 EUR: Manager
 }
 
-# === Debug-Modus aktivieren (für Entwicklungszwecke) ===
-DEBUG_MODE = True
