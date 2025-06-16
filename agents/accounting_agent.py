@@ -1,14 +1,18 @@
 import json
 import re
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
-from config import OLLAMA_MODEL, RESULTS_PATH
-from utils.cost_center import COST_CENTER_RULES, DEFAULT_COST_CENTER
+from config import OLLAMA_MODEL, RESULTS_PATH, OLLAMA_BASE_URL
 
+from utils.cost_center import COST_CENTER_RULES, DEFAULT_COST_CENTER
 class AccountingAgent:
     def __init__(self, validation_result_path=RESULTS_PATH):
         # Initialisiere das LLM (lokales Mistral-Modell über Ollama)
-        self.llm = Ollama(model=OLLAMA_MODEL)
+        self.llm = OllamaLLM(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_BASE_URL
+)
+
         # Lade das Ergebnis der Validierung (Pflichtangaben-Tabelle) aus der JSON-Datei
         with open(validation_result_path, "r", encoding="utf-8") as file:
             self.data = json.load(file).get("validation", "")

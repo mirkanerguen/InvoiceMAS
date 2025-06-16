@@ -1,19 +1,23 @@
 # supervisor_agent.py
 import json
 import re
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from agents.validation_agent import ValidationAgent
 from agents.accounting_agent import AccountingAgent
 from agents.approval_agent import ApprovalAgent
 from agents.booking_agent import BookingAgent
 from agents.check_agent import CheckAgent
 from agents.archive_agent import ArchiveAgent
-from config import RESULTS_PATH, OLLAMA_MODEL, WORKFLOW_STATUS_PATH
+from config import RESULTS_PATH, OLLAMA_MODEL, WORKFLOW_STATUS_PATH, OLLAMA_BASE_URL
 
 class SupervisorAgent:
     def __init__(self, pdf_path):
         # LLM und Pfad speichern
-        self.llm = Ollama(model=OLLAMA_MODEL)
+        self.llm = OllamaLLM(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_BASE_URL
+)
+
         self.pdf_path = pdf_path
 
         # ValidationAgent vorbereiten

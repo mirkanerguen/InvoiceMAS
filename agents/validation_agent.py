@@ -1,9 +1,9 @@
 import re
 import pandas as pd
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
 from utils.pdf_parser import extract_text_from_pdf
-from config import OLLAMA_MODEL, OWN_COMPANY_FULL
+from config import OLLAMA_MODEL, OWN_COMPANY_FULL, OLLAMA_BASE_URL
 
 class ValidationAgent:
     def __init__(self, pdf_path):
@@ -14,7 +14,11 @@ class ValidationAgent:
         self.invoice_text = extract_text_from_pdf(pdf_path)
 
         # Modellinstanz initialisieren
-        self.llm = Ollama(model=OLLAMA_MODEL)
+        self.llm = OllamaLLM(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_BASE_URL
+)
+
 
     def goal(self):
         # Zieldefinition für Prompt
@@ -58,9 +62,10 @@ Deine aktuellen Gedanken sind: {{agent_thoughts}}
 Extrahiere aus dem Rechnungstext folgende Pflichtangaben exakt und ohne Zusatzinformationen.
 Falls Angaben nicht vorhanden sind, gib exakt „Fehlt“ an.
 
-Besonderheit: Wenn der Name und die Anschrift der eigenen Firma in der Rechnung vorkommen, handelt es sich dabei um den Leistungsempfänger.
-Die eigene Firma lautet:
+Besonderheit: Wenn der Name und die Anschrift der eigenen Firma in der Rechnung vorkommen, handelt es sich dabei IMMER um den Leistungsempfänger. Trage diese Daten ausschließlich in | 2. Name & Anschrift des Leistungsempfängers | Ja/Nein | Nur Name und Anschrift | ein!
+Die Absenderdaten (leistender Unternehmer) sind dann die anderen Namens- und Adressinformationen, die **nicht** dem eigenen Unternehmen entsprechen.
 
+Die eigene Firma lautet:
 {OWN_COMPANY_FULL}
 
 Solltest du diese Angaben im Rechnungstext finden, trage sie in der Tabelle unter „Name & Anschrift des Leistungsempfängers“ ein.

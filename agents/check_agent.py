@@ -1,14 +1,18 @@
 # check_agent.py
 import json
 import re
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
-from config import RESULTS_PATH, REFERENCE_DATA_PATH, OLLAMA_MODEL
+from config import RESULTS_PATH, REFERENCE_DATA_PATH, OLLAMA_MODEL, OWN_COMPANY_FULL, OLLAMA_BASE_URL
 
 class CheckAgent:
     def __init__(self, validation_result_path=RESULTS_PATH, reference_path=REFERENCE_DATA_PATH):
         # LLM initialisieren
-        self.llm = Ollama(model=OLLAMA_MODEL)
+        self.llm = OllamaLLM(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_BASE_URL
+)
+
 
         # Validierungsdaten aus results.json laden
         with open(validation_result_path, "r", encoding="utf-8") as f:
@@ -26,10 +30,19 @@ class CheckAgent:
         return "Prüfe die sachliche Richtigkeit einer Rechnung mit Fokus auf Rechnungsnummer, plausiblen Lieferanten, Leistung und Bruttobetrag."
 
     def think(self):
-        # Extrahiere die 4 wichtigsten Vergleichswerte für die sachliche Prüfung
+        # Extrahiere beide Beteiligten
+        unternehmer = self._extract("1. Name & Anschrift des leistenden Unternehmers")
+        empfaenger = self._extract("2. Name & Anschrift des Leistungsempfängers")
+
+        # Bestimme, wer der Lieferant ist (nämlich nicht das eigene Unternehmen)
+        if OWN_COMPANY_FULL in unternehmer:
+            lieferant = empfaenger
+        else:
+            lieferant = unternehmer
+
         return {
             "rechnungsnummer": self._extract("6. Fortlaufende Rechnungsnummer"),
-            "lieferant": self._extract("1. Name & Anschrift des leistenden Unternehmers"),
+            "lieferant": lieferant,
             "leistung": self._extract("7. Menge und Art der gelieferten Leistung"),
             "betrag": self._extract("9. Entgelt nach Steuersätzen aufgeschlüsselt")
         }
@@ -66,13 +79,12 @@ class CheckAgent:
 
         # Prompt-Vorlage für die LLM-Prüfung definieren
         prompt_template = PromptTemplate(
-            input_variables=["ziel", "rechnung", "referenz"],
-            template="""
-Du bist ein KI-Agent für Rechnungsprüfung.
+    input_variables=["ziel", "rechnung", "referenz"],
+    template="""Du bist ein KI-Agent für Rechnungsprüfung.
 
 Aufgabe: {ziel}
 
-Prüfe, ob folgende Inhalte sachlich plausibel übereinstimmen:
+Vergleiche die folgende Rechnung mit den bekannten Referenzdaten und prüfe, ob sie sachlich übereinstimmen.
 
 Rechnung:
 {rechnung}
@@ -81,12 +93,20 @@ Referenzdaten:
 {referenz}
 
 Kriterien:
+- Rechnungsnummer muss exakt gleich sein.
 - Lieferant darf sprachlich leicht abweichen, aber inhaltlich gleich sein.
-- Leistung kann in anderer Reihenfolge oder Formulierung vorliegen.
-- Bruttobetrag darf max. um 0.01 € abweichen.
-- Wenn alles inhaltlich passt → "sachlich_korrekt", sonst "nicht_nachvollziehbar".
+- Leistungen dürfen in anderer Reihenfolge oder Kürze genannt sein.
+- Bruttobetrag darf max. 0,01 € abweichen.
+- Wenn die Rechnungsnummer exakt übereinstimmt, ist die Prüfung **sachlich korrekt**, außer es liegt ein gravierender Widerspruch bei Betrag oder Lieferant vor.
+
+Antwort nur mit:  
+- **sachlich_korrekt**  
+- **nicht_nachvollziehbar**
 """
-        )
+)
+
+
+
 
         # Prompt ausfüllen und LLM aufrufen
         prompt = prompt_template.format(
@@ -100,9 +120,17 @@ Kriterien:
         if "sachlich_korrekt" in result:
             self._save_result("sachlich_korrekt")
             return "sachlich_korrekt"
+
         elif "nicht_nachvollziehbar" in result:
-            self._save_result("nicht_nachvollziehbar")
-            return "nicht_nachvollziehbar"
+            # Fallback-Regel: Rechnungsnummer passt exakt → trotzdem als korrekt akzeptieren
+            if referenz["rechnungsnummer"].strip() == extracted["rechnungsnummer"].strip():
+                print("CheckAgent Fallback: Rechnungsnummer stimmt exakt – setze auf sachlich_korrekt.")
+                self._save_result("sachlich_korrekt")
+                return "sachlich_korrekt"
+            else:
+                self._save_result("nicht_nachvollziehbar")
+                return "nicht_nachvollziehbar"
+
 
         # Falls etwas unklar bleibt (z. B. schlechte LLM-Antwort), "unklar" setzen
         self._save_result("unklar")

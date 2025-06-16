@@ -1,11 +1,12 @@
 import json
 import re
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from config import (
     OLLAMA_MODEL,
     RESULTS_PATH,
     TEAMLEITER_ROLE,
-    ABTEILUNGSLEITER_ROLE
+    ABTEILUNGSLEITER_ROLE,
+    OLLAMA_BASE_URL
 )
 from utils.login import check_credentials
 from utils.approval_tool import map_bruttobetrag_to_role
@@ -13,7 +14,11 @@ from utils.approval_tool import map_bruttobetrag_to_role
 class ApprovalAgent:
     def __init__(self, result_path=RESULTS_PATH):
         # Initialisiere LLM und lade das results.json
-        self.llm = Ollama(model=OLLAMA_MODEL)
+        self.llm = OllamaLLM(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_BASE_URL
+)
+
         self.result_path = result_path
 
         # Lade vorhandene Ergebnisse aus der Datei

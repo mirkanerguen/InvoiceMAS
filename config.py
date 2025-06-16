@@ -24,6 +24,8 @@ ABTEILUNGSLEITER_ROLE = "Abteilungsleiter"
 
 # === Genutztes LLM-Modell über Ollama (lokal) ===
 OLLAMA_MODEL = "mistral"
+OLLAMA_BASE_URL = "http://localhost:11434"
+
 
 # === Schwellenwerte für Genehmigungsrollen (brutto) ===
 APPROVAL_RULES = {

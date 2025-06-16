@@ -1,13 +1,17 @@
 import json
 import re
 import sqlite3
-from langchain_community.llms import Ollama
-from config import RESULTS_PATH, ARCHIVE_DB_PATH, OLLAMA_MODEL
+from langchain_ollama import OllamaLLM
+from config import RESULTS_PATH, ARCHIVE_DB_PATH, OLLAMA_MODEL, OLLAMA_BASE_URL
 
 class BookingAgent:
     def __init__(self, intermediate_path=RESULTS_PATH):
         # Initialisierung des LLM und Laden des result.json
-        self.llm = Ollama(model=OLLAMA_MODEL)
+        self.llm = OllamaLLM(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_BASE_URL
+)
+
         self.path = intermediate_path
 
         with open(self.path, "r", encoding="utf-8") as f:
