@@ -1,8 +1,8 @@
 {
     "1_validation": 2,
     "2_accounting": 2,
-    "3_check": 0,
-    "4_approval": 0,
-    "5_booking": 0,
-    "6_archiving": 0
+    "3_check": 2,
+    "4_approval": 2,
+    "5_booking": 2,
+    "6_archiving": 2
 }
