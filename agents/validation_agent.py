@@ -144,13 +144,20 @@ Antworte kurz und präzise mit einem Satz."""
         # Debug-Ausgabe für Rohantwort
         print("ValidationAgent Raw Output:\n", result)
 
-        # Umwandlung in lesbares Markdown-Format
-        result = result.replace("\n", " ")
-        result = re.sub(r"\|\s*(\d+\.)", r"\n|\1", result)
+        # Text säubern und korrekt umbrechen: Jede Tabellenzeile mit Pflichtangabe wird neu erkannt
+        lines = result.replace("\n", " ").split("|")
+        restructured_lines = []
+        for i in range(1, len(lines) - 2, 3):
+            try:
+                zeile = f"| {lines[i].strip()} | {lines[i+1].strip()} | {lines[i+2].strip()} |"
+                restructured_lines.append(zeile)
+            except IndexError:
+                continue
 
-        clean_result = result.strip()
+        clean_result = "\n".join(restructured_lines).strip()
         print("ValidationAgent Action(): Daten extrahiert.")
         return clean_result
+
 
     def run(self, missing_fields=None):
         # Hauptmethode: Durchführung mit oder ohne gezielte Pflichtfelder
