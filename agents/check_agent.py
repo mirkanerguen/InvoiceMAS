@@ -87,7 +87,7 @@ class CheckAgent:
 
     Kriterien:
     - Rechnungsnummer muss exakt gleich sein.
-    - Lieferant darf sprachlich leicht abweichen, aber inhaltlich gleich sein.
+    - Der Name des Lieferanten darf leicht abweichen. **Adressen können ignoriert werden.
     - Leistungen dürfen in anderer Reihenfolge oder Kürze genannt sein.
     - Bruttobetrag darf max. 0,01 € abweichen.
     - Wenn die Rechnungsnummer exakt übereinstimmt, ist die Prüfung **sachlich korrekt**, außer es liegt ein gravierender Widerspruch bei Betrag oder Lieferant vor.
@@ -149,7 +149,7 @@ class CheckAgent:
 
     def _extract_bruttobetrag(self, betrag_text):
         # Versuche den Bruttobetrag aus der Textzeile zu extrahieren
-        match = re.search(r"([\d\.,]+)\s*€?\s*\(Brutto\)", betrag_text)
+        match = re.search(r"([\d\.,]+)\s*€?\s*\((Brutto|Gesamt).*?\)", betrag_text, re.IGNORECASE)
         return match.group(1).replace(",", ".") if match else "0.00"
 
     def _normalize_text(self, text):

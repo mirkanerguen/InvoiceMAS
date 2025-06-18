@@ -129,7 +129,6 @@ Antworte kurz und präzise mit einem Satz."""
         return agent_thoughts.strip()
 
     def action(self, agent_thoughts, custom_prompt=None):
-        # Entweder benutzerdefinierter Prompt oder Standardprompt verwenden
         if custom_prompt:
             formatted_prompt = custom_prompt
         else:
@@ -138,24 +137,19 @@ Antworte kurz und präzise mit einem Satz."""
                 agent_thoughts=agent_thoughts
             )
 
-        # Prompt an LLM senden
         result = self.llm.invoke(formatted_prompt)
-
-        # Debug-Ausgabe für Rohantwort
         print("ValidationAgent Raw Output:\n", result)
 
-        # Text säubern und korrekt umbrechen: Jede Tabellenzeile mit Pflichtangabe wird neu erkannt
-        lines = result.replace("\n", " ").split("|")
-        restructured_lines = []
-        for i in range(1, len(lines) - 2, 3):
-            try:
-                zeile = f"| {lines[i].strip()} | {lines[i+1].strip()} | {lines[i+2].strip()} |"
-                restructured_lines.append(zeile)
-            except IndexError:
-                continue
+        # Nur gültige Markdown-Zeilen mit genau drei Spalten extrahieren
+        pattern = r"^\|\s*.*?\s*\|\s*.*?\s*\|\s*.*?\s*\|$"
+        clean_lines = [line.strip() for line in result.splitlines() if re.match(pattern, line.strip())]
 
-        clean_result = "\n".join(restructured_lines).strip()
-        print("ValidationAgent Action(): Daten extrahiert.")
+        # Falls nichts gefunden wurde – Fehlermeldung
+        if not clean_lines:
+            raise ValueError("Keine gültige Markdown-Tabelle im Ergebnis gefunden.")
+
+        clean_result = "\n".join(clean_lines)
+        print("ValidationAgent Action(): Tabelle bereinigt.")
         return clean_result
 
 

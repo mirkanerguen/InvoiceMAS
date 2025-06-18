@@ -85,18 +85,23 @@ class SupervisorAgent:
         return agent.run(missing_fields=fehlende_felder)
 
     def merge_validation_results(self, original: str, improved: str) -> str:
-        # Kombiniert alte Tabelle mit neu extrahierten Feldern (ersetzt fehlende Einträge)
         original_lines = original.splitlines()
         improved_lines = improved.splitlines()
         updated = []
+
         for o_line in original_lines:
-            if "| Nein | -" in o_line or "| Fehlt | -" in o_line:
-                key = o_line.split("|")[1].strip()
-                match = next((l for l in improved_lines if key in l and "| Ja" in l), None)
-                updated.append(match if match else o_line)
+            # Extrahiere Pflichtfeld-Name und Status
+            match = re.match(r"\|\s*(.*?)\s*\|\s*(Fehlt|Nein)\s*\|\s*(.*?)\s*\|", o_line)
+            if match:
+                field_name = match.group(1).strip()
+                # Suche passende Zeile mit gleichem Feldnamen und Status "Ja" im neuen Ergebnis
+                new_line = next((l for l in improved_lines if field_name in l and "| Ja" in l), None)
+                updated.append(new_line if new_line else o_line)
             else:
                 updated.append(o_line)
+
         return "\n".join(updated)
+
 
     def think(self, agent_result, step):
         # LLM-Evaluation: Prüfe, ob der Agent alles korrekt geliefert hat
